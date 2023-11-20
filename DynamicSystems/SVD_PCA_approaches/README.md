@@ -4,4 +4,4 @@
 * PCA
 * DMD
 * Koopman
-* SINDy
+* SINDy (https://github.com/dynamicslab/pysindy/tree/master)
