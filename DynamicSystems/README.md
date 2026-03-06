@@ -7,6 +7,9 @@
 
 ```
 
+
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -76,8 +79,8 @@ for i in range(iters):
 
     traj = torch.stack(traj)      # shape (T, N, 3)
 
-    # encourage staying on positive wing (x > 0)
-    loss = torch.relu(-traj[:,:,0]).mean()
+    target_sign = -1   # +1 right wing, -1 left wing
+    loss        = torch.relu(-target_sign * traj[:,:,0]).mean()
 
     optimizer.zero_grad()
     loss.backward()
@@ -103,7 +106,6 @@ plt.ylabel("z")
 plt.title("Trajectories favoring one Lorenz wing")
 
 plt.show()
-
 
 
 
