@@ -111,3 +111,15 @@ plt.show()
 
 
 ```
+
+## NIO and simple Navier Stokes
+
+
+
+
+
+
+
+
+
+
