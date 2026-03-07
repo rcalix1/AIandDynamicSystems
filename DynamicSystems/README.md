@@ -118,6 +118,9 @@ plt.show()
 ![Navier Stokes Animation](navier_stokes.gif)
 
 
+![Navier Stokes Animation](navier_stokes_quiver.gif)
+
+
 
 
 
