@@ -1,6 +1,7 @@
-## Classic Dynamic Systems
+## AI and Dynamic Systems
 
-* link
+* Dynamic systems 
+* using NIO
 
 ## NIO and Lorenz equations
 
