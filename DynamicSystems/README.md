@@ -2,6 +2,7 @@
 
 * Dynamic systems 
 * using NIO
+* Paper: Discovering Structure in Dynamical Systems using Neural Input Optimization
 
 ## NIO and Lorenz equations
 
