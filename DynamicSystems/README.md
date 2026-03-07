@@ -115,6 +115,9 @@ plt.show()
 ## NIO and simple Navier Stokes
 
 
+![Navier Stokes Animation](navier_stokes.gif)
+
+
 
 
 
