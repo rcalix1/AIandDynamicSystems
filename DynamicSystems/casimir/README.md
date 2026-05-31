@@ -232,6 +232,356 @@ plt.show()
 
 
 
+## Discovering the Lorenz Attractor from Data using Neural Input Optimization
+
+
+```python
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+import numpy as np
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+
+# ==========================================================
+# STEP 1
+# Generate Lorenz Data
+# (After this step we pretend the equations are unknown)
+# ==========================================================
+
+sigma = 10.0
+rho   = 28.0
+beta  = 8.0/3.0
+
+def lorenz_step(x):
+
+    dx = sigma*(x[:,1]-x[:,0])
+
+    dy = x[:,0]*(rho-x[:,2]) - x[:,1]
+
+    dz = x[:,0]*x[:,1] - beta*x[:,2]
+
+    return torch.stack([dx,dy,dz],dim=1)
+
+def simulate_lorenz(
+        x0,
+        n_steps=5000,
+        dt=0.01):
+
+    x = x0.clone()
+
+    traj = []
+
+    for _ in range(n_steps):
+
+        x = x + dt*lorenz_step(x)
+
+        traj.append(x.clone())
+
+    return torch.cat(traj,dim=0)
+
+x0 = torch.tensor(
+    [[1.0,1.0,1.0]],
+    device=device
+)
+
+traj = simulate_lorenz(x0)
+
+lorenz_data = traj.detach()
+
+print("Data shape:",lorenz_data.shape)
+
+# ==========================================================
+# STEP 2
+# Train Density Network
+#
+# Positive samples:
+#     Lorenz trajectory
+#
+# Negative samples:
+#     Random points in space
+#
+# Network learns:
+#
+#     f(x,y,z)
+#
+# probability point belongs
+# to attractor
+# ==========================================================
+
+mins = lorenz_data.min(dim=0)[0]
+maxs = lorenz_data.max(dim=0)[0]
+
+n_real = len(lorenz_data)
+
+random_points = (
+    mins
+    +
+    (maxs-mins)
+    *
+    torch.rand(
+        n_real,
+        3,
+        device=device
+    )
+)
+
+X = torch.cat([
+    lorenz_data,
+    random_points
+])
+
+y = torch.cat([
+    torch.ones(n_real,1,device=device),
+    torch.zeros(n_real,1,device=device)
+])
+
+perm = torch.randperm(len(X))
+
+X = X[perm]
+y = y[perm]
+
+# ==========================================================
+# Density Model
+# ==========================================================
+
+model = nn.Sequential(
+
+    nn.Linear(3,64),
+    nn.ReLU(),
+
+    nn.Linear(64,64),
+    nn.ReLU(),
+
+    nn.Linear(64,1),
+    nn.Sigmoid()
+
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=1e-3
+)
+
+criterion = nn.BCELoss()
+
+loss_history = []
+
+for epoch in range(300):
+
+    optimizer.zero_grad()
+
+    pred = model(X)
+
+    loss = criterion(pred,y)
+
+    loss.backward()
+
+    optimizer.step()
+
+    loss_history.append(
+        loss.item()
+    )
+
+    if epoch % 50 == 0:
+        print(
+            epoch,
+            loss.item()
+        )
+
+# ==========================================================
+# Plot Training Loss
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(loss_history)
+
+plt.title(
+    "Density Model Training"
+)
+
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+
+plt.show()
+
+# ==========================================================
+# STEP 3
+# NIO Structure Discovery
+#
+# Optimize point x
+#
+# maximize density score
+#
+# score = model(x)
+#
+# Repeated many times
+#
+# produces attractor cloud
+# ==========================================================
+
+discovered_points = []
+
+for trial in range(2000):
+
+    z = nn.Parameter(
+
+        mins
+        +
+        (maxs-mins)
+        *
+        torch.rand(
+            3,
+            device=device
+        )
+
+    )
+
+    opt = torch.optim.Adam(
+        [z],
+        lr=0.05
+    )
+
+    for step in range(150):
+
+        opt.zero_grad()
+
+        score = model(
+            z.unsqueeze(0)
+        )
+
+        loss = -score.mean()
+
+        loss.backward()
+
+        opt.step()
+
+    discovered_points.append(
+        z.detach().cpu().numpy()
+    )
+
+discovered_points = np.array(
+    discovered_points
+)
+
+# ==========================================================
+# STEP 4
+# Visual Comparison
+# ==========================================================
+
+sample_idx = np.random.choice(
+    len(lorenz_data),
+    5000,
+    replace=False
+)
+
+true_points = (
+    lorenz_data[
+        sample_idx
+    ]
+    .cpu()
+    .numpy()
+)
+
+fig = plt.figure(
+    figsize=(12,5)
+)
+
+ax1 = fig.add_subplot(
+    121,
+    projection='3d'
+)
+
+ax1.scatter(
+    true_points[:,0],
+    true_points[:,1],
+    true_points[:,2],
+    s=1
+)
+
+ax1.set_title(
+    "Ground Truth Attractor"
+)
+
+ax2 = fig.add_subplot(
+    122,
+    projection='3d'
+)
+
+ax2.scatter(
+    discovered_points[:,0],
+    discovered_points[:,1],
+    discovered_points[:,2],
+    s=3
+)
+
+ax2.set_title(
+    "NIO Discovered Structure"
+)
+
+plt.show()
+
+# ==========================================================
+# STEP 5
+# Simple Coverage Metric
+# ==========================================================
+
+true_center = np.mean(
+    true_points,
+    axis=0
+)
+
+discovered_center = np.mean(
+    discovered_points,
+    axis=0
+)
+
+center_distance = np.linalg.norm(
+    true_center -
+    discovered_center
+)
+
+print()
+print(
+    "Center Distance:",
+    center_distance
+)
+
+# ==========================================================
+# Optional:
+# Density Heatmap
+# ==========================================================
+
+scores = []
+
+for p in discovered_points:
+
+    p_t = torch.tensor(
+        p,
+        dtype=torch.float32,
+        device=device
+    )
+
+    score = model(
+        p_t.unsqueeze(0)
+    )
+
+    scores.append(
+        score.item()
+    )
+
+scores = np.array(scores)
+
+print(
+    "Average Density Score:",
+    scores.mean()
+)
+```
+
+
 
 
 
