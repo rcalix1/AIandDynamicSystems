@@ -1575,6 +1575,247 @@ print(
 
 ## String
 
+points
+
+
+
+```python
+# ==========================================================
+# PAPER A
+# STRING POINT DISCOVERY VIA NIO
+#
+# Goal:
+# Find pluck locations that produce
+# rich harmonic content.
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+
+# ==========================================================
+# PARAMETERS
+# ==========================================================
+
+N_MODES = 20
+
+# ==========================================================
+# NIO VARIABLE
+# ==========================================================
+
+z = nn.Parameter(
+    torch.tensor([0.0], device=device)
+)
+
+optimizer = torch.optim.Adam(
+    [z],
+    lr=0.05
+)
+
+history = []
+
+# ==========================================================
+# OBJECTIVE
+#
+# Harmonic richness
+# ==========================================================
+
+for step in range(500):
+
+    optimizer.zero_grad()
+
+    x = torch.sigmoid(z)
+
+    amplitudes = []
+
+    for n in range(1,N_MODES+1):
+
+        amp = torch.sin(
+            np.pi*n*x
+        )
+
+        amplitudes.append(
+            torch.abs(amp)
+        )
+
+    amplitudes = torch.stack(
+        amplitudes
+    )
+
+    richness = amplitudes.sum()
+
+    loss = -richness
+
+    loss.backward()
+
+    optimizer.step()
+
+    history.append(
+        richness.item()
+    )
+
+# ==========================================================
+# RESULT
+# ==========================================================
+
+best_x = torch.sigmoid(z).item()
+
+print()
+print("Best pluck position:",best_x)
+print("Richness:",history[-1])
+
+# ==========================================================
+# CONVERGENCE
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(history)
+
+plt.title(
+    "NIO Convergence"
+)
+
+plt.xlabel("Iteration")
+plt.ylabel("Richness")
+
+plt.show()
+
+# ==========================================================
+# HARMONIC SPECTRUM
+# ==========================================================
+
+amps = []
+
+for n in range(1,N_MODES+1):
+
+    amps.append(
+        np.abs(
+            np.sin(
+                np.pi*n*best_x
+            )
+        )
+    )
+
+plt.figure(figsize=(8,4))
+
+plt.bar(
+    np.arange(1,N_MODES+1),
+    amps
+)
+
+plt.xlabel(
+    "Mode Number"
+)
+
+plt.ylabel(
+    "Amplitude"
+)
+
+plt.title(
+    "Spectrum at NIO Location"
+)
+
+plt.show()
+
+# ==========================================================
+# FULL SEARCH CURVE
+# ==========================================================
+
+xs = np.linspace(
+    0.01,
+    0.99,
+    500
+)
+
+scores = []
+
+for x in xs:
+
+    s = 0
+
+    for n in range(1,N_MODES+1):
+
+        s += abs(
+            np.sin(
+                np.pi*n*x
+            )
+        )
+
+    scores.append(s)
+
+scores = np.array(scores)
+
+plt.figure(figsize=(8,4))
+
+plt.plot(
+    xs,
+    scores
+)
+
+plt.scatter(
+    [best_x],
+    [history[-1]],
+    color="red",
+    s=80
+)
+
+plt.xlabel(
+    "Pluck Position"
+)
+
+plt.ylabel(
+    "Richness"
+)
+
+plt.title(
+    "Important Point Discovery"
+)
+
+plt.show()
+
+# ==========================================================
+# RANDOM SEARCH BASELINE
+# ==========================================================
+
+best_random = -1
+
+for _ in range(10000):
+
+    x = np.random.uniform(
+        0.01,
+        0.99
+    )
+
+    score = 0
+
+    for n in range(1,N_MODES+1):
+
+        score += abs(
+            np.sin(
+                np.pi*n*x
+            )
+        )
+
+    best_random = max(
+        best_random,
+        score
+    )
+
+print()
+print("Random Best:",best_random)
+print("NIO Best   :",history[-1])
+print("Improvement:",
+      history[-1]/best_random)
+```
+
+
 
 
 structure
