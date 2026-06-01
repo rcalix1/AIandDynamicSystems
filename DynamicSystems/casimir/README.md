@@ -917,6 +917,424 @@ print(
 ```
 
 
+## String
+
+
+
+structure
+
+
+```python
+# ==========================================================
+# PAPER B
+# STRING MODE STRUCTURE DISCOVERY VIA NIO
+#
+# Hidden Structure:
+# Harmonic Manifold
+#
+# Analogous to:
+#
+# Lorenz -> Butterfly Attractor
+#
+# String -> Harmonic Mode Manifold
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+np.random.seed(0)
+
+# ==========================================================
+# STEP 1
+# Generate Observations
+#
+# Physics:
+#
+# f_n = n/(2L)*sqrt(T/mu)
+#
+# AI never sees equation.
+# ==========================================================
+
+N_MODES = 10
+N_SAMPLES = 5000
+
+spectra = []
+
+lengths = np.random.uniform(
+    0.5,
+    5.0,
+    N_SAMPLES
+)
+
+tensions = np.random.uniform(
+    20.0,
+    200.0,
+    N_SAMPLES
+)
+
+densities = np.random.uniform(
+    0.01,
+    0.10,
+    N_SAMPLES
+)
+
+for L,T,mu in zip(
+        lengths,
+        tensions,
+        densities):
+
+    base = (1.0/(2.0*L))*np.sqrt(T/mu)
+
+    spectrum = []
+
+    for n in range(1,N_MODES+1):
+
+        spectrum.append(
+            n*base
+        )
+
+    spectrum = np.array(spectrum)
+
+    spectrum += np.random.normal(
+        0,
+        0.01*np.mean(spectrum),
+        N_MODES
+    )
+
+    spectra.append(
+        spectrum
+    )
+
+spectra = np.array(spectra)
+
+print(
+    "Spectra shape:",
+    spectra.shape
+)
+
+# ==========================================================
+# STEP 2
+# Negatives
+#
+# Random spectra
+# ==========================================================
+
+mins = spectra.min(axis=0)
+maxs = spectra.max(axis=0)
+
+negative = np.random.uniform(
+    mins,
+    maxs,
+    size=spectra.shape
+)
+
+X = np.vstack([
+    spectra,
+    negative
+])
+
+y = np.concatenate([
+    np.ones(len(spectra)),
+    np.zeros(len(negative))
+])
+
+# ==========================================================
+# STEP 3
+# Torch
+# ==========================================================
+
+X = torch.tensor(
+    X,
+    dtype=torch.float32,
+    device=device
+)
+
+y = torch.tensor(
+    y.reshape(-1,1),
+    dtype=torch.float32,
+    device=device
+)
+
+# ==========================================================
+# STEP 4
+# Density Network
+# ==========================================================
+
+model = nn.Sequential(
+
+    nn.Linear(
+        N_MODES,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        64
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        64,
+        1
+    ),
+    nn.Sigmoid()
+
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=1e-3
+)
+
+criterion = nn.BCELoss()
+
+loss_history = []
+
+for epoch in range(300):
+
+    optimizer.zero_grad()
+
+    pred = model(X)
+
+    loss = criterion(
+        pred,
+        y
+    )
+
+    loss.backward()
+
+    optimizer.step()
+
+    loss_history.append(
+        loss.item()
+    )
+
+    if epoch % 50 == 0:
+
+        print(
+            epoch,
+            loss.item()
+        )
+
+# ==========================================================
+# Training Curve
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(
+    loss_history
+)
+
+plt.title(
+    "Density Model Training"
+)
+
+plt.xlabel(
+    "Epoch"
+)
+
+plt.ylabel(
+    "Loss"
+)
+
+plt.show()
+
+# ==========================================================
+# STEP 5
+# NIO Structure Discovery
+#
+# Discover spectra
+# belonging to hidden manifold
+# ==========================================================
+
+discovered = []
+
+for trial in range(2000):
+
+    z = nn.Parameter(
+
+        torch.tensor(
+            np.random.uniform(
+                mins,
+                maxs
+            ),
+            dtype=torch.float32,
+            device=device
+        )
+
+    )
+
+    opt = torch.optim.Adam(
+        [z],
+        lr=0.05
+    )
+
+    for step in range(150):
+
+        opt.zero_grad()
+
+        score = model(
+            z.unsqueeze(0)
+        )
+
+        loss = -score.mean()
+
+        loss.backward()
+
+        opt.step()
+
+    discovered.append(
+        z.detach().cpu().numpy()
+    )
+
+discovered = np.array(
+    discovered
+)
+
+# ==========================================================
+# STEP 6
+# Compare Manifolds
+# ==========================================================
+
+plt.figure(
+    figsize=(8,6)
+)
+
+for i in range(100):
+
+    plt.plot(
+        spectra[i],
+        alpha=0.05,
+        color="blue"
+    )
+
+for i in range(100):
+
+    plt.plot(
+        discovered[i],
+        alpha=0.05,
+        color="red"
+    )
+
+plt.title(
+    "Blue=True Harmonic Manifold\nRed=NIO Structure"
+)
+
+plt.xlabel(
+    "Mode Index"
+)
+
+plt.ylabel(
+    "Frequency"
+)
+
+plt.show()
+
+# ==========================================================
+# STEP 7
+# Mean Spectrum Error
+# ==========================================================
+
+true_mean = spectra.mean(
+    axis=0
+)
+
+disc_mean = discovered.mean(
+    axis=0
+)
+
+mse = np.mean(
+    (true_mean-disc_mean)**2
+)
+
+print()
+print(
+    "Mean Spectrum MSE:",
+    mse
+)
+
+# ==========================================================
+# STEP 8
+# PCA Visualization
+# ==========================================================
+
+from sklearn.decomposition import PCA
+
+combined = np.vstack([
+    spectra,
+    discovered
+])
+
+pca = PCA(
+    n_components=2
+)
+
+proj = pca.fit_transform(
+    combined
+)
+
+n_true = len(spectra)
+
+plt.figure(
+    figsize=(7,6)
+)
+
+plt.scatter(
+    proj[:n_true,0],
+    proj[:n_true,1],
+    s=5,
+    alpha=0.3,
+    label="True Structure"
+)
+
+plt.scatter(
+    proj[n_true:,0],
+    proj[n_true:,1],
+    s=5,
+    alpha=0.3,
+    label="NIO Structure"
+)
+
+plt.legend()
+
+plt.title(
+    "Harmonic Manifold Discovery"
+)
+
+plt.show()
+
+print()
+print("Finished.")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
