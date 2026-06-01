@@ -1324,6 +1324,405 @@ print("Finished.")
 
 
 
+## EM Cavity
+
+
+
+structure 
+
+
+```python
+# ==========================================================
+# PAPER B
+# EM CAVITY MODE STRUCTURE DISCOVERY
+#
+# Hidden Structure:
+# Electromagnetic Mode Manifold
+#
+# Physics:
+#
+# f_mnp =
+# c/2 * sqrt(
+# (m/a)^2 +
+# (n/b)^2 +
+# (p/c)^2
+# )
+#
+# AI only sees spectra.
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+np.random.seed(0)
+
+# ==========================================================
+# PARAMETERS
+# ==========================================================
+
+N_MODES = 12
+N_SAMPLES = 5000
+
+# ==========================================================
+# MODE GENERATOR
+# ==========================================================
+
+def cavity_modes(ax, ay, az):
+
+    modes = []
+
+    for m in range(1,4):
+        for n in range(1,4):
+            for p in range(1,4):
+
+                f = np.sqrt(
+                    (m/ax)**2 +
+                    (n/ay)**2 +
+                    (p/az)**2
+                )
+
+                modes.append(f)
+
+    modes = np.sort(modes)
+
+    return modes[:N_MODES]
+
+# ==========================================================
+# GENERATE OBSERVATIONS
+# ==========================================================
+
+spectra = []
+
+for _ in range(N_SAMPLES):
+
+    ax = np.random.uniform(
+        0.5,
+        5.0
+    )
+
+    ay = np.random.uniform(
+        0.5,
+        5.0
+    )
+
+    az = np.random.uniform(
+        0.5,
+        5.0
+    )
+
+    s = cavity_modes(
+        ax,
+        ay,
+        az
+    )
+
+    s += np.random.normal(
+        0,
+        0.01*np.mean(s),
+        len(s)
+    )
+
+    spectra.append(s)
+
+spectra = np.array(
+    spectra
+)
+
+print(
+    "Spectra shape:",
+    spectra.shape
+)
+
+# ==========================================================
+# NEGATIVES
+# ==========================================================
+
+mins = spectra.min(axis=0)
+maxs = spectra.max(axis=0)
+
+negative = np.random.uniform(
+    mins,
+    maxs,
+    size=spectra.shape
+)
+
+X = np.vstack([
+    spectra,
+    negative
+])
+
+y = np.concatenate([
+    np.ones(len(spectra)),
+    np.zeros(len(negative))
+])
+
+# ==========================================================
+# TORCH
+# ==========================================================
+
+X = torch.tensor(
+    X,
+    dtype=torch.float32,
+    device=device
+)
+
+y = torch.tensor(
+    y.reshape(-1,1),
+    dtype=torch.float32,
+    device=device
+)
+
+# ==========================================================
+# DENSITY MODEL
+# ==========================================================
+
+model = nn.Sequential(
+
+    nn.Linear(
+        N_MODES,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        64
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        64,
+        1
+    ),
+    nn.Sigmoid()
+
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=1e-3
+)
+
+criterion = nn.BCELoss()
+
+history = []
+
+# ==========================================================
+# TRAIN
+# ==========================================================
+
+for epoch in range(300):
+
+    optimizer.zero_grad()
+
+    pred = model(X)
+
+    loss = criterion(
+        pred,
+        y
+    )
+
+    loss.backward()
+
+    optimizer.step()
+
+    history.append(
+        loss.item()
+    )
+
+    if epoch % 50 == 0:
+
+        print(
+            epoch,
+            loss.item()
+        )
+
+# ==========================================================
+# LOSS CURVE
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(history)
+
+plt.title(
+    "Density Model Training"
+)
+
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+
+plt.show()
+
+# ==========================================================
+# NIO DISCOVERY
+# ==========================================================
+
+discovered = []
+
+for trial in range(2000):
+
+    z = nn.Parameter(
+
+        torch.tensor(
+            np.random.uniform(
+                mins,
+                maxs
+            ),
+            dtype=torch.float32,
+            device=device
+        )
+
+    )
+
+    opt = torch.optim.Adam(
+        [z],
+        lr=0.05
+    )
+
+    for step in range(150):
+
+        opt.zero_grad()
+
+        score = model(
+            z.unsqueeze(0)
+        )
+
+        loss = -score.mean()
+
+        loss.backward()
+
+        opt.step()
+
+    discovered.append(
+        z.detach().cpu().numpy()
+    )
+
+discovered = np.array(
+    discovered
+)
+
+# ==========================================================
+# STRUCTURE VISUALIZATION
+# ==========================================================
+
+plt.figure(figsize=(8,6))
+
+for i in range(100):
+
+    plt.plot(
+        spectra[i],
+        alpha=0.05,
+        color="blue"
+    )
+
+for i in range(100):
+
+    plt.plot(
+        discovered[i],
+        alpha=0.05,
+        color="red"
+    )
+
+plt.title(
+    "Blue=True EM Mode Manifold\nRed=NIO Structure"
+)
+
+plt.xlabel(
+    "Mode Index"
+)
+
+plt.ylabel(
+    "Frequency"
+)
+
+plt.show()
+
+# ==========================================================
+# MSE METRIC
+# ==========================================================
+
+true_mean = spectra.mean(
+    axis=0
+)
+
+disc_mean = discovered.mean(
+    axis=0
+)
+
+mse = np.mean(
+    (true_mean-disc_mean)**2
+)
+
+print()
+print(
+    "Mean Spectrum MSE:",
+    mse
+)
+
+# ==========================================================
+# PCA VIEW
+# ==========================================================
+
+combined = np.vstack([
+    spectra,
+    discovered
+])
+
+pca = PCA(
+    n_components=2
+)
+
+proj = pca.fit_transform(
+    combined
+)
+
+n_true = len(spectra)
+
+plt.figure(
+    figsize=(7,6)
+)
+
+plt.scatter(
+    proj[:n_true,0],
+    proj[:n_true,1],
+    s=5,
+    alpha=0.3,
+    label="True Structure"
+)
+
+plt.scatter(
+    proj[n_true:,0],
+    proj[n_true:,1],
+    s=5,
+    alpha=0.3,
+    label="NIO Structure"
+)
+
+plt.legend()
+
+plt.title(
+    "EM Mode Manifold Discovery"
+)
+
+plt.show()
+
+print()
+print("Finished.")
+```
 
 
 
