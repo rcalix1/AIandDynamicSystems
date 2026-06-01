@@ -2224,6 +2224,223 @@ print("Finished.")
 ## EM Cavity
 
 
+```python
+# ==========================================================
+# PAPER A
+# EM CAVITY IMPORTANT GEOMETRY DISCOVERY
+#
+# Goal:
+# Find cavity dimensions producing
+# rich resonant structure.
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+
+# ==========================================================
+# PARAMETERS
+# ==========================================================
+
+MAX_INDEX = 4
+
+# ==========================================================
+# MODE GENERATOR
+# ==========================================================
+
+def cavity_modes(ax,ay,az):
+
+    modes = []
+
+    for m in range(1,MAX_INDEX):
+        for n in range(1,MAX_INDEX):
+            for p in range(1,MAX_INDEX):
+
+                f = np.sqrt(
+                    (m/ax)**2 +
+                    (n/ay)**2 +
+                    (p/az)**2
+                )
+
+                modes.append(f)
+
+    return np.array(modes)
+
+# ==========================================================
+# NIO VARIABLES
+# ==========================================================
+
+z = nn.Parameter(
+    torch.zeros(3,device=device)
+)
+
+optimizer = torch.optim.Adam(
+    [z],
+    lr=0.05
+)
+
+history = []
+
+# ==========================================================
+# OBJECTIVE
+#
+# maximize number of modes
+# below cutoff frequency
+# ==========================================================
+
+F_CUTOFF = 4.0
+
+for step in range(500):
+
+    optimizer.zero_grad()
+
+    dims = (
+        0.5
+        +
+        4.5*torch.sigmoid(z)
+    )
+
+    ax,ay,az = dims
+
+    score = 0
+
+    for m in range(1,MAX_INDEX):
+        for n in range(1,MAX_INDEX):
+            for p in range(1,MAX_INDEX):
+
+                f = torch.sqrt(
+                    (m/ax)**2 +
+                    (n/ay)**2 +
+                    (p/az)**2
+                )
+
+                score += torch.sigmoid(
+                    10*(F_CUTOFF-f)
+                )
+
+    loss = -score
+
+    loss.backward()
+
+    optimizer.step()
+
+    history.append(
+        score.item()
+    )
+
+# ==========================================================
+# RESULT
+# ==========================================================
+
+dims = (
+    0.5
+    +
+    4.5*torch.sigmoid(z)
+).detach().cpu().numpy()
+
+print()
+print("Best Geometry")
+print("a =",dims[0])
+print("b =",dims[1])
+print("c =",dims[2])
+
+# ==========================================================
+# CONVERGENCE
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(history)
+
+plt.title(
+    "NIO Convergence"
+)
+
+plt.xlabel("Iteration")
+plt.ylabel("Mode Density")
+
+plt.show()
+
+# ==========================================================
+# SPECTRUM
+# ==========================================================
+
+modes = cavity_modes(
+    dims[0],
+    dims[1],
+    dims[2]
+)
+
+modes = np.sort(modes)
+
+plt.figure(figsize=(8,4))
+
+plt.vlines(
+    modes,
+    0,
+    1
+)
+
+plt.axvline(
+    F_CUTOFF,
+    color='red'
+)
+
+plt.title(
+    "Discovered EM Spectrum"
+)
+
+plt.xlabel(
+    "Frequency"
+)
+
+plt.show()
+
+# ==========================================================
+# RANDOM BASELINE
+# ==========================================================
+
+best_random = -1
+
+for _ in range(10000):
+
+    ax = np.random.uniform(0.5,5)
+    ay = np.random.uniform(0.5,5)
+    az = np.random.uniform(0.5,5)
+
+    score = 0
+
+    for m in range(1,MAX_INDEX):
+        for n in range(1,MAX_INDEX):
+            for p in range(1,MAX_INDEX):
+
+                f = np.sqrt(
+                    (m/ax)**2 +
+                    (n/ay)**2 +
+                    (p/az)**2
+                )
+
+                score += (
+                    f < F_CUTOFF
+                )
+
+    best_random = max(
+        best_random,
+        score
+    )
+
+print()
+print("Random Best:",best_random)
+print("NIO Best   :",history[-1])
+```
+
+
 
 structure 
 
