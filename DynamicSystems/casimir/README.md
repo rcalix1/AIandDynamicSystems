@@ -558,13 +558,427 @@ print("Finished.")
 
 
 
-and 
+even better structure casimir 
 
+```python id="rk0j3n"
+# ==========================================================
+# PAPER B
+# CASIMIR VACUUM MODE MANIFOLD DISCOVERY
+#
+# Hidden Structure:
+# Vacuum Mode Manifold
+#
+# Geometry
+#     ↓
+# Allowed Modes
+#     ↓
+# Observations
+#
+# AI only sees spectra.
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+np.random.seed(0)
+
+# ==========================================================
+# PARAMETERS
+# ==========================================================
+
+N_MODES   = 12
+N_SAMPLES = 5000
+
+# ==========================================================
+# VACUUM MODE GENERATOR
+#
+# Parallel Plates
+#
+# f_n = n*c/(2a)
+#
+# AI never sees:
+#
+# a
+#
+# ==========================================================
+
+C = 1.0
+
+def vacuum_modes(a):
+
+    modes = []
+
+    for n in range(1,N_MODES+1):
+
+        f = n*C/(2*a)
+
+        modes.append(f)
+
+    return np.array(modes)
+
+# ==========================================================
+# GENERATE OBSERVATIONS
+# ==========================================================
+
+spectra = []
+
+plate_spacings = np.random.uniform(
+    0.2,
+    5.0,
+    N_SAMPLES
+)
+
+for a in plate_spacings:
+
+    s = vacuum_modes(a)
+
+    # measurement noise
+
+    s += np.random.normal(
+        0,
+        0.01*np.mean(s),
+        N_MODES
+    )
+
+    spectra.append(s)
+
+spectra = np.array(
+    spectra
+)
+
+print(
+    "Spectra shape:",
+    spectra.shape
+)
+
+# ==========================================================
+# NEGATIVE SAMPLES
+#
+# Random spectra
+# ==========================================================
+
+mins = spectra.min(axis=0)
+maxs = spectra.max(axis=0)
+
+negative = np.random.uniform(
+    mins,
+    maxs,
+    size=spectra.shape
+)
+
+X = np.vstack([
+    spectra,
+    negative
+])
+
+y = np.concatenate([
+    np.ones(len(spectra)),
+    np.zeros(len(negative))
+])
+
+# ==========================================================
+# TORCH
+# ==========================================================
+
+X = torch.tensor(
+    X,
+    dtype=torch.float32,
+    device=device
+)
+
+y = torch.tensor(
+    y.reshape(-1,1),
+    dtype=torch.float32,
+    device=device
+)
+
+# ==========================================================
+# DENSITY MODEL
+# ==========================================================
+
+model = nn.Sequential(
+
+    nn.Linear(
+        N_MODES,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        128
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        128,
+        64
+    ),
+    nn.ReLU(),
+
+    nn.Linear(
+        64,
+        1
+    ),
+    nn.Sigmoid()
+
+).to(device)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=1e-3
+)
+
+criterion = nn.BCELoss()
+
+history = []
+
+# ==========================================================
+# TRAIN
+# ==========================================================
+
+for epoch in range(300):
+
+    optimizer.zero_grad()
+
+    pred = model(X)
+
+    loss = criterion(
+        pred,
+        y
+    )
+
+    loss.backward()
+
+    optimizer.step()
+
+    history.append(
+        loss.item()
+    )
+
+    if epoch % 50 == 0:
+
+        print(
+            epoch,
+            loss.item()
+        )
+
+# ==========================================================
+# TRAINING CURVE
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(history)
+
+plt.title(
+    "Density Model Training"
+)
+
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+
+plt.show()
+
+# ==========================================================
+# NIO STRUCTURE DISCOVERY
+#
+# Discover spectra
+# belonging to hidden
+# vacuum manifold
+# ==========================================================
+
+discovered = []
+
+for trial in range(2000):
+
+    z = nn.Parameter(
+
+        torch.tensor(
+            np.random.uniform(
+                mins,
+                maxs
+            ),
+            dtype=torch.float32,
+            device=device
+        )
+
+    )
+
+    opt = torch.optim.Adam(
+        [z],
+        lr=0.05
+    )
+
+    for step in range(150):
+
+        opt.zero_grad()
+
+        score = model(
+            z.unsqueeze(0)
+        )
+
+        loss = -score.mean()
+
+        loss.backward()
+
+        opt.step()
+
+    discovered.append(
+        z.detach().cpu().numpy()
+    )
+
+discovered = np.array(
+    discovered
+)
+
+# ==========================================================
+# STRUCTURE VISUALIZATION
+# ==========================================================
+
+plt.figure(figsize=(8,6))
+
+for i in range(100):
+
+    plt.plot(
+        spectra[i],
+        alpha=0.05,
+        color="blue"
+    )
+
+for i in range(100):
+
+    plt.plot(
+        discovered[i],
+        alpha=0.05,
+        color="red"
+    )
+
+plt.title(
+    "Blue=True Vacuum Mode Manifold\nRed=NIO Structure"
+)
+
+plt.xlabel(
+    "Mode Index"
+)
+
+plt.ylabel(
+    "Frequency"
+)
+
+plt.show()
+
+# ==========================================================
+# RECONSTRUCTION ERROR
+# ==========================================================
+
+true_mean = spectra.mean(
+    axis=0
+)
+
+disc_mean = discovered.mean(
+    axis=0
+)
+
+mse = np.mean(
+    (true_mean-disc_mean)**2
+)
+
+print()
+print(
+    "Mean Spectrum MSE:",
+    mse
+)
+
+# ==========================================================
+# PCA VISUALIZATION
+# ==========================================================
+
+combined = np.vstack([
+    spectra,
+    discovered
+])
+
+pca = PCA(
+    n_components=2
+)
+
+proj = pca.fit_transform(
+    combined
+)
+
+n_true = len(spectra)
+
+plt.figure(
+    figsize=(7,6)
+)
+
+plt.scatter(
+    proj[:n_true,0],
+    proj[:n_true,1],
+    s=5,
+    alpha=0.3,
+    label="True Structure"
+)
+
+plt.scatter(
+    proj[n_true:,0],
+    proj[n_true:,1],
+    s=5,
+    alpha=0.3,
+    label="NIO Structure"
+)
+
+plt.legend()
+
+plt.title(
+    "Vacuum Mode Manifold Discovery"
+)
+
+plt.show()
+
+# ==========================================================
+# OPTIONAL
+# RECOVER IMPLIED SPACING
+# ==========================================================
+
+implied_spacing = []
+
+for s in discovered:
+
+    f1 = s[0]
+
+    a_est = C/(2*f1)
+
+    implied_spacing.append(
+        a_est
+    )
+
+implied_spacing = np.array(
+    implied_spacing
+)
+
+print()
+print(
+    "Recovered spacing range:"
+)
+
+print(
+    implied_spacing.min(),
+    implied_spacing.max()
+)
+
+print()
+print("Finished.")
 ```
 
-
-
-```
 
 
 ## Discovering the Lorenz Attractor from Data using Neural Input Optimization
