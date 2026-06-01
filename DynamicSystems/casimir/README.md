@@ -91,6 +91,248 @@ print("Improvement:", history[-1]/max(random_scores))
 
 ```
 
+
+more points
+
+
+```python
+# ==========================================================
+# PAPER A
+# Casimir Point Discovery via NIO
+#
+# Goal:
+# Discover important plate spacings.
+#
+# NIO directly optimizes spacing.
+#
+# No training.
+# No density model.
+#
+# ==========================================================
+
+import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+torch.manual_seed(0)
+
+# ==========================================================
+# Casimir Force
+#
+# F = K / a^4
+#
+# Simplified normalized model.
+# ==========================================================
+
+K = 1.0
+
+def casimir_force(a):
+    return K/(a**4)
+
+# ==========================================================
+# Search Range
+# ==========================================================
+
+A_MIN = 0.2
+A_MAX = 5.0
+
+# ==========================================================
+# NIO Variable
+#
+# z unconstrained
+#
+# a = mapped spacing
+# ==========================================================
+
+z = nn.Parameter(
+    torch.tensor([0.0], device=device)
+)
+
+optimizer = torch.optim.Adam(
+    [z],
+    lr=0.05
+)
+
+history = []
+
+# ==========================================================
+# Objective
+#
+# Discover spacing producing
+# maximum Casimir force.
+# ==========================================================
+
+for step in range(500):
+
+    optimizer.zero_grad()
+
+    a = (
+        A_MIN
+        +
+        (A_MAX-A_MIN)
+        *
+        torch.sigmoid(z)
+    )
+
+    force = casimir_force(a)
+
+    loss = -force
+
+    loss.backward()
+
+    optimizer.step()
+
+    history.append(
+        force.item()
+    )
+
+# ==========================================================
+# Result
+# ==========================================================
+
+best_a = (
+    A_MIN
+    +
+    (A_MAX-A_MIN)
+    *
+    torch.sigmoid(z)
+).item()
+
+print()
+print("Best spacing:",best_a)
+print("Force:",history[-1])
+
+# ==========================================================
+# Convergence Plot
+# ==========================================================
+
+plt.figure(figsize=(6,4))
+
+plt.plot(history)
+
+plt.title(
+    "NIO Convergence"
+)
+
+plt.xlabel("Iteration")
+plt.ylabel("Casimir Force")
+
+plt.show()
+
+# ==========================================================
+# Compare Against Full Curve
+# ==========================================================
+
+a_grid = np.linspace(
+    A_MIN,
+    A_MAX,
+    1000
+)
+
+f_grid = K/(a_grid**4)
+
+plt.figure(figsize=(7,4))
+
+plt.plot(
+    a_grid,
+    f_grid,
+    label="Casimir Force"
+)
+
+plt.scatter(
+    [best_a],
+    [history[-1]],
+    s=80,
+    color="red",
+    label="NIO Solution"
+)
+
+plt.xlabel(
+    "Plate Spacing"
+)
+
+plt.ylabel(
+    "Force"
+)
+
+plt.legend()
+
+plt.title(
+    "Paper A: Important Point Discovery"
+)
+
+plt.show()
+
+# ==========================================================
+# Random Search Baseline
+# ==========================================================
+
+best_random = -1
+
+for _ in range(10000):
+
+    a = np.random.uniform(
+        A_MIN,
+        A_MAX
+    )
+
+    score = K/(a**4)
+
+    best_random = max(
+        best_random,
+        score
+    )
+
+print()
+print("Random Best:",best_random)
+print("NIO Best   :",history[-1])
+
+print(
+    "Improvement:",
+    history[-1]/best_random
+)
+
+# ==========================================================
+# Sensitivity Curve
+#
+# Useful paper figure
+# ==========================================================
+
+gradient = np.abs(
+    np.gradient(
+        f_grid,
+        a_grid
+    )
+)
+
+plt.figure(figsize=(7,4))
+
+plt.plot(
+    a_grid,
+    gradient
+)
+
+plt.xlabel(
+    "Plate Spacing"
+)
+
+plt.ylabel(
+    "|dF/da|"
+)
+
+plt.title(
+    "Regions of Rapid Change"
+)
+
+plt.show()
+```
+
+
+
+
 * structure
 
 
