@@ -2,6 +2,345 @@
 
 * https://principus.si/2026/04/06/james-gleick-chaos/
 
+## Lyapunov
+
+```python
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# =====================================================
+# LORENZ SYSTEM
+# =====================================================
+
+sigma = 10.0
+beta  = 8.0 / 3.0
+rho   = 28.0
+
+dt = 0.01
+
+
+def lorenz_step(x):
+
+    dx = sigma * (x[1] - x[0])
+
+    dy = x[0] * (rho - x[2]) - x[1]
+
+    dz = x[0] * x[1] - beta * x[2]
+
+    return x + dt * np.array([dx, dy, dz])
+
+
+def simulate_lorenz(x0, steps=1000):
+
+    x = np.array(x0, dtype=np.float64)
+
+    traj = np.zeros((steps + 1, 3))
+
+    traj[0] = x
+
+    for i in range(steps):
+
+        x = lorenz_step(x)
+
+        traj[i + 1] = x
+
+    return traj
+
+
+# =====================================================
+# NIO SCORE
+# SAME IDEA AS PAPER A LOSS
+# =====================================================
+
+def nio_divergence_score(
+    x0,
+    delta=1e-6,
+    steps=1000
+):
+
+    x1 = np.array(x0)
+
+    x2 = np.array(x0)
+
+    x2[0] += delta
+
+    traj1 = simulate_lorenz(x1, steps)
+
+    traj2 = simulate_lorenz(x2, steps)
+
+    separation = np.linalg.norm(
+        traj2 - traj1,
+        axis=1
+    )
+
+    score = np.sum(separation**2)
+
+    return score
+
+
+# =====================================================
+# FINITE TIME LYAPUNOV
+# =====================================================
+
+def finite_time_lyapunov(
+    x0,
+    delta=1e-6,
+    steps=1000
+):
+
+    x1 = np.array(x0)
+
+    x2 = np.array(x0)
+
+    x2[0] += delta
+
+    traj1 = simulate_lorenz(x1, steps)
+
+    traj2 = simulate_lorenz(x2, steps)
+
+    d0 = np.linalg.norm(
+        traj2[0] - traj1[0]
+    )
+
+    dT = np.linalg.norm(
+        traj2[-1] - traj1[-1]
+    )
+
+    dT = max(dT, 1e-12)
+
+    lam = np.log(dT / d0) / (steps * dt)
+
+    return lam
+
+
+# =====================================================
+# RANDOM BASELINE
+# =====================================================
+
+def generate_random_points(n=200):
+
+    pts = np.zeros((n,3))
+
+    pts[:,0] = np.random.uniform(-20,20,n)
+
+    pts[:,1] = np.random.uniform(-30,30,n)
+
+    pts[:,2] = np.random.uniform(0,50,n)
+
+    return pts
+
+
+random_points = generate_random_points(200)
+
+# =====================================================
+# COMPUTE FTLE
+# =====================================================
+
+print("Computing FTLE values...")
+
+high_ftle = []
+low_ftle = []
+rand_ftle = []
+
+for p in high_points:
+
+    high_ftle.append(
+        finite_time_lyapunov(p)
+    )
+
+for p in low_points:
+
+    low_ftle.append(
+        finite_time_lyapunov(p)
+    )
+
+for p in random_points:
+
+    rand_ftle.append(
+        finite_time_lyapunov(p)
+    )
+
+high_ftle = np.array(high_ftle)
+low_ftle = np.array(low_ftle)
+rand_ftle = np.array(rand_ftle)
+
+# =====================================================
+# SUMMARY TABLE
+# =====================================================
+
+print("\n==============================")
+print("FINITE TIME LYAPUNOV RESULTS")
+print("==============================")
+
+print(
+    "NIO MAX  Mean FTLE:",
+    np.mean(high_ftle)
+)
+
+print(
+    "NIO MIN  Mean FTLE:",
+    np.mean(low_ftle)
+)
+
+print(
+    "Random   Mean FTLE:",
+    np.mean(rand_ftle)
+)
+
+print()
+
+print(
+    "NIO MAX  Std:",
+    np.std(high_ftle)
+)
+
+print(
+    "NIO MIN  Std:",
+    np.std(low_ftle)
+)
+
+print(
+    "Random   Std:",
+    np.std(rand_ftle)
+)
+
+# =====================================================
+# HISTOGRAM
+# =====================================================
+
+plt.figure(figsize=(8,5))
+
+plt.hist(
+    high_ftle,
+    bins=20,
+    alpha=0.6,
+    label="NIO Max"
+)
+
+plt.hist(
+    low_ftle,
+    bins=20,
+    alpha=0.6,
+    label="NIO Min"
+)
+
+plt.hist(
+    rand_ftle,
+    bins=20,
+    alpha=0.6,
+    label="Random"
+)
+
+plt.xlabel("Finite-Time Lyapunov Exponent")
+plt.ylabel("Count")
+
+plt.title("FTLE Distribution")
+
+plt.legend()
+
+plt.show()
+
+# =====================================================
+# BOXPLOT
+# =====================================================
+
+plt.figure(figsize=(6,5))
+
+plt.boxplot(
+    [
+        high_ftle,
+        low_ftle,
+        rand_ftle
+    ],
+    labels=[
+        "NIO Max",
+        "NIO Min",
+        "Random"
+    ]
+)
+
+plt.ylabel("FTLE")
+
+plt.title("FTLE Comparison")
+
+plt.show()
+
+# =====================================================
+# CORRELATION WITH NIO SCORE
+# =====================================================
+
+print("\nComputing NIO scores...")
+
+high_scores = []
+
+for p in high_points:
+
+    high_scores.append(
+        nio_divergence_score(p)
+    )
+
+high_scores = np.array(high_scores)
+
+corr = np.corrcoef(
+    high_scores,
+    high_ftle
+)[0,1]
+
+print()
+
+print(
+    "Correlation (NIO Score vs FTLE):",
+    corr
+)
+
+plt.figure(figsize=(7,5))
+
+plt.scatter(
+    high_scores,
+    high_ftle,
+    alpha=0.7
+)
+
+plt.xlabel("NIO Divergence Score")
+
+plt.ylabel("FTLE")
+
+plt.title(
+    f"NIO Score vs FTLE\nCorrelation={corr:.3f}"
+)
+
+plt.show()
+
+# =====================================================
+# MOST CHAOTIC POINT
+# =====================================================
+
+idx = np.argmax(high_ftle)
+
+print("\nMost Chaotic NIO Point")
+
+print(
+    "Initial Condition:",
+    high_points[idx]
+)
+
+print(
+    "FTLE:",
+    high_ftle[idx]
+)
+
+print(
+    "NIO Score:",
+    high_scores[idx]
+)
+
+
+
+```
+
 
 ## Cassimir
 
