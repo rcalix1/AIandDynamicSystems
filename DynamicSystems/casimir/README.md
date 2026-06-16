@@ -1,6 +1,9 @@
-## Chaos by James Gleick
+## Readings
 
-* https://principus.si/2026/04/06/james-gleick-chaos/
+* Chaos by James Gleick - https://principus.si/2026/04/06/james-gleick-chaos/
+* The Dripping Faucet as a Chaotic System by Rober Shaw
+* Ergodic theory of chaos and strange attractors, J.-P. Eckmann, D. Ruelle
+* Strange Attractors, Chaotic Behavior, and Information Flow, Robert Shaw
 
 ## Lyapunov
 
