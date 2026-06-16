@@ -1,3 +1,8 @@
+## Chaos by James Gleick
+
+* https://principus.si/2026/04/06/james-gleick-chaos/
+
+
 ## Cassimir
 
 
