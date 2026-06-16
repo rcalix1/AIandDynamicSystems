@@ -4,6 +4,16 @@
 
 ## Lyapunov
 
+
+Mean FTLE
+
+NIO-Max      1.25
+
+Random       0.82
+
+NIO-Min      0.18
+
+
 ```python
 
 
