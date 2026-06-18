@@ -3712,13 +3712,9 @@ $$
 The key visualization used in this work is the density difference map:
 
 $$
-D(x,y)
-======
 
-## 
-\rho_{\max}(x,y)
+D(x,y) =  \rho_{\max}(x,y) -  \rho_{\min}(x,y)
 
-\rho_{\min}(x,y)
 $$
 
 This quantity directly measures where NIO preferentially identifies sensitive states.
