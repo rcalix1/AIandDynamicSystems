@@ -3605,6 +3605,174 @@ print("  Table_MinSensitive.csv")
 
 
 
+## Math notes
+
+
+
+## Projection Plots
+
+Each NIO solution corresponds to a point in the three-dimensional Lorenz state space:
+
+$$
+p_i = (x_i, y_i, z_i)
+$$
+
+To visualize the distribution of sensitive and insensitive states, we project the three-dimensional state space onto two-dimensional planes.
+
+### XY Projection
+
+$$
+\Pi_{xy}(x,y,z) = (x,y)
+$$
+
+### XZ Projection
+
+$$
+\Pi_{xz}(x,y,z) = (x,z)
+$$
+
+### YZ Projection
+
+$$
+\Pi_{yz}(x,y,z) = (y,z)
+$$
+
+In practice, the projection plots are obtained by simply discarding one coordinate:
+
+* XY projection removes $z$
+* XZ projection removes $y$
+* YZ projection removes $x$
+
+Although mathematically simple, these projections revealed structures that were difficult to observe in the full three-dimensional state space.
+
+---
+
+## Sensitivity Density Maps
+
+The projection plots provide a qualitative view of the discovered states. To quantify where NIO prefers to place sensitive initial conditions, we estimate probability densities for both the max-sensitive and min-sensitive sets using Kernel Density Estimation (KDE).
+
+### Kernel Density Estimation
+
+Suppose the max-sensitive set contains:
+
+$$
+(x_1,y_1), (x_2,y_2), \ldots, (x_N,y_N)
+$$
+
+The density estimate is
+
+$$
+\rho_{\max}(x,y)
+================
+
+\frac{1}{N}
+\sum_{i=1}^{N}
+K_h
+\Big(
+(x,y)-(x_i,y_i)
+\Big)
+$$
+
+where $K_h$ is a Gaussian kernel.
+
+The Gaussian kernel is
+
+$$
+K_h(\mathbf r)
+==============
+
+\frac{1}{2\pi h^2}
+\exp
+\left(
+-\frac{|\mathbf r|^2}
+{2h^2}
+\right)
+$$
+
+Each point contributes a small Gaussian bump, and the density estimate is obtained by summing all bumps.
+
+Similarly, for the min-sensitive points:
+
+$$
+\rho_{\min}(x,y)
+================
+
+\frac{1}{M}
+\sum_{j=1}^{M}
+K_h
+\Big(
+(x,y)-(u_j,v_j)
+\Big)
+$$
+
+---
+
+## Density Difference Map
+
+The key visualization used in this work is the density difference map:
+
+$$
+D(x,y)
+======
+
+## \rho_{\max}(x,y)
+
+\rho_{\min}(x,y)
+$$
+
+This quantity directly measures where NIO preferentially identifies sensitive states.
+
+### Interpretation
+
+#### Red Regions
+
+$$
+D(x,y) > 0
+$$
+
+These locations contain a higher density of max-sensitive states than min-sensitive states.
+
+NIO prefers these regions.
+
+#### Blue Regions
+
+$$
+D(x,y) < 0
+$$
+
+These locations contain a higher density of min-sensitive states.
+
+NIO avoids these regions when searching for highly sensitive initial conditions.
+
+#### White Regions
+
+$$
+D(x,y) \approx 0
+$$
+
+No significant difference exists between the two populations.
+
+---
+
+## Scientific Interpretation
+
+The density difference maps transform a collection of optimized initial conditions into an interpretable sensitivity map of the Lorenz state space.
+
+Rather than simply reporting a list of coordinates, the workflow becomes:
+
+$$
+\text{NIO}
+\rightarrow
+\text{Sensitive States}
+\rightarrow
+\text{Projection Plots}
+\rightarrow
+\text{Density Maps}
+\rightarrow
+\text{Interpretation}
+$$
+
+This process functions as a form of "state-space oscilloscope," allowing researchers to visualize where sensitivity is concentrated and to iteratively explore the structure of complex nonlinear systems.
 
 
 
