@@ -3694,15 +3694,7 @@ Each point contributes a small Gaussian bump, and the density estimate is obtain
 Similarly, for the min-sensitive points:
 
 $$
-\rho_{\min}(x,y)
-================
-
-\frac{1}{M}
-\sum_{j=1}^{M}
-K_h
-\Big(
-(x,y)-(u_j,v_j)
-\Big)
+\rho_{\min}(x,y) = \frac{1}{M} \sum_{j=1}^{M} K_h \Big( (x,y)-(u_j,v_j) \Big)
 $$
 
 ---
@@ -3712,9 +3704,7 @@ $$
 The key visualization used in this work is the density difference map:
 
 $$
-
 D(x,y) =  \rho_{\max}(x,y) -  \rho_{\min}(x,y)
-
 $$
 
 This quantity directly measures where NIO preferentially identifies sensitive states.
