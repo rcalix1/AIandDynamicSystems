@@ -3677,16 +3677,8 @@ where $K_h$ is a Gaussian kernel.
 
 The Gaussian kernel is
 
-$$
-K_h(\mathbf r)
-==============
-
-\frac{1}{2\pi h^2}
-\exp
-\left(
--\frac{|\mathbf r|^2}
-{2h^2}
-\right)
+$$ 
+K_h(\mathbf r) = \frac{1}{2\pi h^2} \exp \left( -\frac{|\mathbf r|^2} {2h^2} \right)
 $$
 
 Each point contributes a small Gaussian bump, and the density estimate is obtained by summing all bumps.
