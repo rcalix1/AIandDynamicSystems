@@ -3662,15 +3662,7 @@ $$
 The density estimate is
 
 $$
-\rho_{\max}(x,y)
-================
-
-\frac{1}{N}
-\sum_{i=1}^{N}
-K_h
-\Big(
-(x,y)-(x_i,y_i)
-\Big)
+\rho_{\max}(x,y) = \frac{1}{N} \sum_{i=1}^{N} K_h \Big( (x,y)-(x_i,y_i) \Big)
 $$
 
 where $K_h$ is a Gaussian kernel.
