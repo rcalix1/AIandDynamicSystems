@@ -9,6 +9,8 @@
 
 NIO identified non-uniform regions of the Lorenz state space associated with enhanced trajectory sensitivity. The discovered regions emerge solely from optimization of trajectory divergence and exhibit clear geometric structure in multiple state-space projections.
 
+* An interactive discovery framework for exploring sensitivity structure in complex systems.
+
 ## Lyapunov
 
 
