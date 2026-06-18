@@ -3204,7 +3204,404 @@ print("Finished.")
 
 
 
+## Projections and density map plots
 
+
+```python
+
+# ============================================================
+# Lorenz NIO Paper
+#
+# Step 1 : Load NIO Results
+# Step 2 : Summary Statistics
+# Step 3 : 3D State Space Plot
+# Step 4 : Projection Plots
+# Step 5 : Sensitivity Density Maps
+#
+# Assumes:
+#   nio_optimized_200_max.csv
+#   nio_optimized_200_minimize.csv
+#
+# Uses:
+#   900-step horizon only
+#
+# Ricardo Calix
+# ============================================================
+
+import pandas as pd
+import numpy as np
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+from scipy.stats import gaussian_kde
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+MAX_FILE = "nio_optimized_200_max.csv"
+MIN_FILE = "nio_optimized_200_minimize.csv"
+
+HORIZON = 900
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+max_df = pd.read_csv(MAX_FILE)
+min_df = pd.read_csv(MIN_FILE)
+
+time_col = [c for c in max_df.columns
+            if "time" in c.lower()][0]
+
+max_data = max_df[max_df[time_col] == HORIZON].copy()
+min_data = min_df[min_df[time_col] == HORIZON].copy()
+
+print("\nLoaded Data")
+print("----------------------------")
+print("Max-sensitive points :", len(max_data))
+print("Min-sensitive points :", len(min_data))
+
+# ============================================================
+# STEP 2
+# SUMMARY STATISTICS
+# ============================================================
+
+print("\n")
+print("="*70)
+print("SUMMARY STATISTICS")
+print("="*70)
+
+def summarize(df, label):
+
+    stats = pd.DataFrame({
+        "Mean": df[["x0","y0","z0"]].mean(),
+        "Std": df[["x0","y0","z0"]].std(),
+        "Min": df[["x0","y0","z0"]].min(),
+        "Max": df[["x0","y0","z0"]].max()
+    })
+
+    print("\n")
+    print(label)
+    print("-"*50)
+    print(stats)
+
+summarize(max_data, "MAX-SENSITIVE")
+summarize(min_data, "MIN-SENSITIVE")
+
+# ============================================================
+# STEP 3
+# FIGURE 1
+# 3D STATE SPACE
+# ============================================================
+
+fig = plt.figure(figsize=(10,8))
+
+ax = fig.add_subplot(
+    111,
+    projection='3d'
+)
+
+ax.scatter(
+    min_data["x0"],
+    min_data["y0"],
+    min_data["z0"],
+    s=10,
+    alpha=0.15,
+    label="Min Sensitive"
+)
+
+ax.scatter(
+    max_data["x0"],
+    max_data["y0"],
+    max_data["z0"],
+    s=40,
+    alpha=0.75,
+    label="Max Sensitive"
+)
+
+ax.set_xlabel("x0")
+ax.set_ylabel("y0")
+ax.set_zlabel("z0")
+
+ax.set_title(
+    f"Lorenz State Space\nMax vs Min Sensitive Initial Conditions ({HORIZON} Steps)"
+)
+
+ax.legend()
+
+plt.tight_layout()
+plt.savefig(
+    "Figure1_3D_StateSpace.png",
+    dpi=300
+)
+
+plt.show()
+
+# ============================================================
+# STEP 4
+# FIGURE 2
+# PROJECTION PLOTS
+# ============================================================
+
+fig, axs = plt.subplots(
+    1,
+    3,
+    figsize=(16,5)
+)
+
+# ------------------------------------------------------------
+# XY
+# ------------------------------------------------------------
+
+axs[0].scatter(
+    min_data["x0"],
+    min_data["y0"],
+    s=10,
+    alpha=0.15,
+    label="Min"
+)
+
+axs[0].scatter(
+    max_data["x0"],
+    max_data["y0"],
+    s=40,
+    alpha=0.7,
+    label="Max"
+)
+
+axs[0].set_title("XY Projection")
+axs[0].set_xlabel("x0")
+axs[0].set_ylabel("y0")
+
+# ------------------------------------------------------------
+# XZ
+# ------------------------------------------------------------
+
+axs[1].scatter(
+    min_data["x0"],
+    min_data["z0"],
+    s=10,
+    alpha=0.15
+)
+
+axs[1].scatter(
+    max_data["x0"],
+    max_data["z0"],
+    s=40,
+    alpha=0.7
+)
+
+axs[1].set_title("XZ Projection")
+axs[1].set_xlabel("x0")
+axs[1].set_ylabel("z0")
+
+# ------------------------------------------------------------
+# YZ
+# ------------------------------------------------------------
+
+axs[2].scatter(
+    min_data["y0"],
+    min_data["z0"],
+    s=10,
+    alpha=0.15
+)
+
+axs[2].scatter(
+    max_data["y0"],
+    max_data["z0"],
+    s=40,
+    alpha=0.7
+)
+
+axs[2].set_title("YZ Projection")
+axs[2].set_xlabel("y0")
+axs[2].set_ylabel("z0")
+
+axs[0].legend()
+
+plt.suptitle(
+    f"Lorenz NIO Initial Conditions ({HORIZON} Steps)"
+)
+
+plt.tight_layout()
+
+plt.savefig(
+    "Figure2_ProjectionPlots.png",
+    dpi=300
+)
+
+plt.show()
+
+# ============================================================
+# STEP 5
+# FIGURE 3
+# SENSITIVITY DENSITY MAPS
+#
+# rho_max - rho_min
+# ============================================================
+
+fig, axs = plt.subplots(
+    1,
+    3,
+    figsize=(16,5)
+)
+
+pairs = [
+    ("x0","y0","XY"),
+    ("x0","z0","XZ"),
+    ("y0","z0","YZ")
+]
+
+for ax, (a,b,title) in zip(axs,pairs):
+
+    all_a = np.concatenate([
+        max_data[a],
+        min_data[a]
+    ])
+
+    all_b = np.concatenate([
+        max_data[b],
+        min_data[b]
+    ])
+
+    grid_a = np.linspace(
+        all_a.min(),
+        all_a.max(),
+        120
+    )
+
+    grid_b = np.linspace(
+        all_b.min(),
+        all_b.max(),
+        120
+    )
+
+    A,B = np.meshgrid(
+        grid_a,
+        grid_b
+    )
+
+    kde_max = gaussian_kde(
+        np.vstack([
+            max_data[a],
+            max_data[b]
+        ])
+    )
+
+    kde_min = gaussian_kde(
+        np.vstack([
+            min_data[a],
+            min_data[b]
+        ])
+    )
+
+    rho_max = kde_max(
+        np.vstack([
+            A.ravel(),
+            B.ravel()
+        ])
+    ).reshape(A.shape)
+
+    rho_min = kde_min(
+        np.vstack([
+            A.ravel(),
+            B.ravel()
+        ])
+    ).reshape(A.shape)
+
+    density_difference = (
+        rho_max - rho_min
+    )
+
+    vmax = np.abs(
+        density_difference
+    ).max()
+
+    image = ax.imshow(
+        density_difference,
+        origin="lower",
+        extent=[
+            grid_a.min(),
+            grid_a.max(),
+            grid_b.min(),
+            grid_b.max()
+        ],
+        aspect="auto",
+        cmap="bwr",
+        vmin=-vmax,
+        vmax=vmax
+    )
+
+    ax.set_title(
+        f"{title}: ρmax - ρmin"
+    )
+
+    ax.set_xlabel(a)
+    ax.set_ylabel(b)
+
+    plt.colorbar(
+        image,
+        ax=ax,
+        fraction=0.046,
+        pad=0.04
+    )
+
+plt.suptitle(
+    f"Sensitivity Density Maps\nLorenz NIO ({HORIZON} Steps)"
+)
+
+plt.tight_layout()
+
+plt.savefig(
+    "Figure3_DensityMaps.png",
+    dpi=300
+)
+
+plt.show()
+
+# ============================================================
+# SAVE SUMMARY TABLES
+# ============================================================
+
+summary_max = pd.DataFrame({
+    "Mean": max_data[["x0","y0","z0"]].mean(),
+    "Std": max_data[["x0","y0","z0"]].std(),
+    "Min": max_data[["x0","y0","z0"]].min(),
+    "Max": max_data[["x0","y0","z0"]].max()
+})
+
+summary_min = pd.DataFrame({
+    "Mean": min_data[["x0","y0","z0"]].mean(),
+    "Std": min_data[["x0","y0","z0"]].std(),
+    "Min": min_data[["x0","y0","z0"]].min(),
+    "Max": min_data[["x0","y0","z0"]].max()
+})
+
+summary_max.to_csv(
+    "Table_MaxSensitive.csv"
+)
+
+summary_min.to_csv(
+    "Table_MinSensitive.csv"
+)
+
+print("\n")
+print("="*70)
+print("DONE")
+print("="*70)
+
+print("Generated:")
+print("  Figure1_3D_StateSpace.png")
+print("  Figure2_ProjectionPlots.png")
+print("  Figure3_DensityMaps.png")
+print("  Table_MaxSensitive.csv")
+print("  Table_MinSensitive.csv")
+
+
+
+```
 
 
 
