@@ -3747,6 +3747,74 @@ This process functions as a form of "state-space oscilloscope," allowing researc
 
 
 
+## Random points instead of min
+
+
+```python
+
+
+
+# ==================================================
+# RANDOM BASELINE
+# ==================================================
+
+import pandas as pd
+import numpy as np
+
+N = 1000
+
+random_x = np.random.uniform(
+    -20,
+    20,
+    N
+)
+
+random_y = np.random.uniform(
+    -30,
+    30,
+    N
+)
+
+random_z = np.random.uniform(
+    0,
+    50,
+    N
+)
+
+random_df = pd.DataFrame({
+    "x0": random_x,
+    "y0": random_y,
+    "z0": random_z
+})
+
+random_df.to_csv(
+    "random_points.csv",
+    index=False
+)
+
+print(random_df.head())
+
+print()
+print("Saved:")
+print("random_points.csv")
+print("Number of points:", len(random_df))
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
