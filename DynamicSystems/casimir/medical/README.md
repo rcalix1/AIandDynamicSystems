@@ -256,3 +256,274 @@ plt.show()
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+## math
+
+
+# Tumor–Immune–Cytokine Dynamical System for Neural Input Optimization
+
+## Overview
+
+This biomedical case study extends Neural Input Optimization (NIO) from the Lorenz system to a simplified tumor–immune–cytokine dynamical system. The goal is to investigate whether NIO can discover biological initial conditions associated with favorable and unfavorable disease progression.
+
+The system contains three state variables:
+
+* **T**: Tumor cell population
+* **I**: Immune effector cell population
+* **C**: Cytokine concentration
+
+Unlike the Lorenz system, where the variables represent fluid dynamics quantities, the variables in this model have direct biological interpretations.
+
+---
+
+# Related Work
+
+The present model is inspired by mathematical oncology and tumor–immune interaction models.
+
+### Classical Tumor–Immune Model
+
+Kuznetsov, V. A.; Makalkin, I. A.; Taylor, M. A.; Perelson, A. S.; Nonlinear Dynamics of Immunogenic Tumors: Parameter Estimation and Global Bifurcation Analysis. *Bulletin of Mathematical Biology* **1994**, *56*(2), 295–321.
+
+This is one of the most influential tumor–immune dynamical systems papers. The model describes the interaction between tumor cells and immune effector cells using coupled nonlinear differential equations.
+
+---
+
+### Mathematical Oncology
+
+Adam, J. A.; Bellomo, N.; *A Survey of Models for Tumor–Immune System Dynamics*. Birkhäuser, Boston, 1997.
+
+This work provides a broad overview of mathematical models describing tumor growth, immune response, and cancer progression.
+
+---
+
+### Tumor–Immune System Modeling
+
+Kirschner, D.; Panetta, J. C.; Modeling Immunotherapy of the Tumor–Immune Interaction. *Journal of Mathematical Biology* **1998**, *37*(3), 235–252.
+
+This paper introduced tumor–immune interaction models that incorporate immune stimulation and treatment effects and became highly influential in cancer systems biology.
+
+---
+
+### Mathematical Oncology Reference
+
+de Pillis, L. G.; Radunskaya, A. E.; Wiseman, C. L.; A Validated Mathematical Model of Cell-Mediated Immune Response to Tumor Growth. *Cancer Research* **2005**, *65*(17), 7950–7958.
+
+This work presents a biologically motivated mathematical framework for studying immune-mediated suppression of tumor growth.
+
+---
+
+# Dynamical System
+
+The tumor–immune–cytokine model is defined by the following ordinary differential equations.
+
+## Tumor Dynamics
+
+```math
+\frac{dT}{dt}
+=
+aT(1-bT)-cTI
+```
+
+where:
+
+* (a) controls tumor growth
+* (b) controls carrying capacity
+* (c) controls immune-mediated tumor suppression
+
+The first term models logistic tumor growth while the second term represents immune destruction of tumor cells.
+
+---
+
+## Immune Dynamics
+
+```math
+\frac{dI}{dt}
+=
+dTI-eI+fC
+```
+
+where:
+
+* (d) controls immune activation
+* (e) controls immune decay
+* (f) controls cytokine stimulation
+
+Immune cells increase in response to tumor presence and cytokine signaling and decrease through natural decay.
+
+---
+
+## Cytokine Dynamics
+
+```math
+\frac{dC}{dt}
+=
+gT-hC
+```
+
+where:
+
+* (g) controls cytokine production
+* (h) controls cytokine decay
+
+This equation represents production of signaling molecules by the tumor and their subsequent degradation.
+
+---
+
+# Numerical Integration
+
+The system is evolved using Euler integration.
+
+For the tumor population:
+
+```math
+T_{t+1}
+=
+T_t
++
+\Delta t
+\left[
+aT_t(1-bT_t)-cT_tI_t
+\right]
+```
+
+For the immune population:
+
+```math
+I_{t+1}
+=
+I_t
++
+\Delta t
+\left[
+dT_tI_t-eI_t+fC_t
+\right]
+```
+
+For the cytokine population:
+
+```math
+C_{t+1}
+=
+C_t
++
+\Delta t
+\left[
+gT_t-hC_t
+\right]
+```
+
+This numerical approach is identical to the Euler integration used in the Lorenz experiments.
+
+---
+
+# Neural Input Optimization
+
+The optimization variables are the initial conditions:
+
+```math
+(T_0,I_0,C_0)
+```
+
+NIO searches the biological state space for conditions associated with favorable and unfavorable outcomes.
+
+---
+
+## Unfavorable Biological States
+
+To discover states associated with aggressive disease progression, NIO maximizes the final tumor burden:
+
+```math
+\max T(t_{final})
+```
+
+The optimization objective becomes:
+
+```math
+L
+=
+-\frac{1}{N}
+\sum_{i=1}^{N}
+T_i(t_{final})
+```
+
+---
+
+## Favorable Biological States
+
+To discover states associated with reduced tumor burden, NIO minimizes the final tumor burden:
+
+```math
+\min T(t_{final})
+```
+
+The optimization objective becomes:
+
+```math
+L
+=
+\frac{1}{N}
+\sum_{i=1}^{N}
+T_i(t_{final})
+```
+
+---
+
+# Scientific Interpretation
+
+The goal of this study is not diagnosis or treatment.
+
+Instead, the goal is to determine whether Neural Input Optimization can automatically discover biologically meaningful regions of state space.
+
+Specifically, NIO searches for initial biological conditions that lead to:
+
+* High tumor burden
+* Low tumor burden
+
+The resulting states can be analyzed using:
+
+* 3D state-space visualizations
+* 2D projections
+* Kernel Density Estimation (KDE)
+* Statistical comparisons
+
+Potential observations include:
+
+* High tumor burden associated with weak immune activity
+* Low tumor burden associated with strong immune activity
+* Distinct cytokine patterns associated with favorable outcomes
+
+---
+
+# Contribution
+
+The primary contribution is not the development of a new cancer model.
+
+The contribution is the application of Neural Input Optimization as a state-space discovery framework for biomedical dynamical systems.
+
+The long-term vision is to apply the same framework to:
+
+* Tumor–immune systems
+* Glucose–insulin systems
+* Cardiac dynamics
+* Biological regulatory networks
+* Epidemic systems
+* Other nonlinear biomedical dynamical systems
+
+In this perspective, NIO functions as a computational search mechanism for discovering important regions of biological state space that may be difficult to identify through manual exploration alone.
+
+
+
+
+
+
+
+
