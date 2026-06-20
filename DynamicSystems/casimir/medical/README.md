@@ -1,5 +1,9 @@
 ## Medical
 
+To get the low-tumor group, change only one line:
+
+* loss = torch.mean(final_tumor)
+
 
 
 ```python
