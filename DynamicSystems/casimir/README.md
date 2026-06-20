@@ -11,46 +11,7 @@ NIO identified non-uniform regions of the Lorenz state space associated with enh
 
 * An interactive discovery framework for exploring sensitivity structure in complex systems.
 
-## Lyapunov math
 
-Given an initial perturbation (\epsilon), the separation between nearby trajectories in a chaotic system grows approximately as
-
-[
-d(t) = \epsilon e^{\lambda t},
-]
-
-where (\lambda) is the largest Lyapunov exponent.
-
-Assuming divergence continues until the separation reaches a characteristic attractor scale (L), the corresponding prediction horizon is
-
-[
-t_{\text{horizon}}
-==================
-
-\frac{\ln(L/\epsilon)}{\lambda}.
-]
-
-For discrete simulations with time step (dt), the horizon measured in simulation steps is
-
-[
-T_{\text{horizon}}
-==================
-
-\frac{\ln(L/\epsilon)}
-{\lambda,dt}.
-]
-
-Using (L=20), (\epsilon=0.01), (\lambda=0.9), and (dt=0.01), the predicted horizon is
-
-[
-T_{\text{horizon}}
-==================
-
-844.
-
-]
-
-This value is compared against the horizon identified experimentally using Neural Input Optimization (NIO).
 
 
 ## Lyapunov
