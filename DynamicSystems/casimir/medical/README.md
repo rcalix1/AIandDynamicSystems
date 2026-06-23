@@ -521,6 +521,90 @@ The long-term vision is to apply the same framework to:
 In this perspective, NIO functions as a computational search mechanism for discovering important regions of biological state space that may be difficult to identify through manual exploration alone.
 
 
+---
+
+
+
+# Finite-Time Lyapunov Exponents (FTLE) in the Tumor–Immune–Cytokine Model
+
+The sensitivity analysis used in this study is based on the **Finite-Time Lyapunov Exponent (FTLE)**, a standard metric from dynamical systems theory that measures how small perturbations to the initial conditions evolve over a finite time horizon.
+
+Given two nearby initial states separated by a small perturbation:
+
+```text
+x₁(0)
+x₂(0) = x₁(0) + δ
+```
+
+the FTLE is computed as:
+
+```math
+λ = \frac{\ln(d_T/d_0)}{T}
+```
+
+where:
+
+```math
+d_0 = \|x_2(0) - x_1(0)\|
+```
+
+is the initial separation,
+
+```math
+d_T = \|x_2(T) - x_1(T)\|
+```
+
+is the separation after evolving the system for time (T), and
+
+```math
+λ
+```
+
+is the finite-time Lyapunov exponent.
+
+In the implementation used for this work:
+
+```python
+d0 = np.linalg.norm(traj2[0] - traj1[0])
+
+dT = np.linalg.norm(traj2[-1] - traj1[-1])
+
+lam = np.log(dT / d0) / (steps * dt)
+```
+
+which is the standard FTLE formulation.
+
+## Interpretation
+
+The FTLE is commonly associated with chaos analysis because positive values indicate exponential divergence of nearby trajectories. However, the tumor–immune–cytokine model studied here is not presented as a chaotic system. Instead, FTLE is used as an independent measure of sensitivity to perturbations in the initial conditions.
+
+Interpretation is straightforward:
+
+```text
+λ > 0   → perturbations grow (sensitive dynamics)
+
+λ = 0   → perturbations remain unchanged
+
+λ < 0   → perturbations shrink (stable dynamics)
+```
+
+The results obtained in this study were predominantly negative, indicating that nearby trajectories tend to converge rather than diverge. Therefore, the FTLE analysis should be interpreted as a measure of finite-time sensitivity and stability rather than evidence of chaotic behavior.
+
+## Role in the BIBM Study
+
+The primary objective of the paper is not to detect chaos, but to evaluate whether Neural Input Optimization (NIO) discovers distinct regions of the tumor–immune–cytokine state space.
+
+FTLE is therefore used as an independent validation metric. If the NIO-generated high-tumor and low-tumor populations exhibit systematically different FTLE distributions, this suggests that NIO is identifying dynamically distinct regions of the system rather than simply sampling random initial conditions.
+
+Consequently, throughout the manuscript the FTLE results can be described as:
+
+> FTLE-based sensitivity analysis
+
+or
+
+> finite-time sensitivity analysis of tumor trajectories
+
+which is mathematically equivalent to the Lyapunov formulation while emphasizing the biomedical interpretation of the results.
 
 
 
