@@ -2,3 +2,7 @@
 
 * Comparing the MIN plot to the MAX plot
 * 
+
+## Figure 9 - Last Time Step loss
+
+(Fig9LastTimeStep.png)[Fig 9]
