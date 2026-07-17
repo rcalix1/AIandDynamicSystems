@@ -5,4 +5,6 @@
 
 ## Figure 9 - Last Time Step loss
 
-![Fig9lossLastStep.png](Fig 9)
+![Fig 9](Fig9lossLastStep.png)
+
+
