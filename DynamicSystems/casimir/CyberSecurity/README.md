@@ -1,7 +1,9 @@
 ## Cyber Security, NIO, and Dynamic Systems
 
+* Dynamic system for malware spread (Max and Min via NIO)
 
 
+## Code
 
 ```python
 
