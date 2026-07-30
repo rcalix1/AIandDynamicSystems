@@ -1,7 +1,7 @@
-## Cyber Security, NIO, and Dynamic Systems
+## Cyber Security, NIO, and Dynamical Systems
 
 * Dynamical system for malware spread (Max and Min via NIO)
-* Dynamic systems have been widely used to study disease spread
+* Dynamical systems have been widely used to study disease spread
 * Here this idea is adapted to malware spread based on Sys Admin policies 
 
 
