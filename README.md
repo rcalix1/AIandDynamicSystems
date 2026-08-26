@@ -2,7 +2,8 @@
 
 This repo provides examples of dynamic systems and AI/ML and application to the Engineering Sciences
 
-* lorenz equations 
+* lorenz equations
+* link
 
 ## Navier Stokes millenium prize 
 
