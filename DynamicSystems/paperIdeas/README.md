@@ -4,6 +4,15 @@
 
 ## NIO + cybersecurity/malware dynamics
 
+
+Expectation is that MAX will drive roughly toward
+
+$$ I_0\uparrow,\qquad \beta\uparrow,\qquad q\downarrow,\qquad u\downarrow $$
+
+and MIN will do approximately the reverse.
+
+
+
 ```
 import torch
 import torch.nn as nn
