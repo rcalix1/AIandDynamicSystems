@@ -13,6 +13,11 @@ and MIN will do approximately the reverse.
 
 
 
+The last graph is actually the one I care about most. If NIO finds that the optimal allocation changes with \(\beta\)—for example, slow malware favors proactive protection while aggressive malware favors rapid isolation, or there is some transition region—that is a result we can start thinking scientifically about.
+And importantly, every optimized variable has a cybersecurity interpretation
+
+
+
 ```
 import torch
 import torch.nn as nn
