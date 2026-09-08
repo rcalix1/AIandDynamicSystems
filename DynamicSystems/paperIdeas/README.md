@@ -579,6 +579,1000 @@ plt.show()
 ```
 
 
+and this one
+
+
+```
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import matplotlib.pyplot as plt
+import pandas as pd
+
+
+# ============================================================
+# NIO CYBERSECURITY EXPERIMENT
+#
+# Malware propagation with a LIMITED security budget.
+#
+# NIO discovers:
+#
+#   I0    = initial fraction of compromised hosts
+#   beta  = malware transmission rate
+#   alpha = fraction of security budget allocated to isolation
+#
+# Security budget:
+#
+#   q = alpha * B
+#   u = (1-alpha) * B
+#
+# where:
+#
+#   q = detection / isolation rate
+#   u = proactive protection / patching rate
+#
+# Therefore NIO CANNOT maximize both defenses.
+# It must decide how the limited security budget should be used.
+#
+# State:
+#
+#   S = susceptible hosts
+#   I = infected hosts
+#   R = removed/protected/isolated hosts
+#   C = cumulative infection burden
+#
+# ============================================================
+
+
+# ------------------------------------------------------------
+# Settings
+# ------------------------------------------------------------
+
+dt = 0.02
+Time_steps = 1000
+iters = 1200
+
+N = 200
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+print("device =", device)
+
+
+# ------------------------------------------------------------
+# Fixed security budget
+# ------------------------------------------------------------
+#
+# q + u = B
+#
+# NIO decides how B is divided.
+#
+# ------------------------------------------------------------
+
+B = 0.50
+
+
+# ============================================================
+# Malware dynamical system
+# ============================================================
+
+class MalwareStep(nn.Module):
+
+    def __init__(self, dt=0.02):
+        super().__init__()
+
+        self.dt = dt
+
+    def forward(self, state, beta, q, u):
+
+        S = state[:, 0]
+        I = state[:, 1]
+        R = state[:, 2]
+        C = state[:, 3]
+
+        # ---------------------------------------------
+        # New infections
+        # ---------------------------------------------
+
+        infection = beta * S * I
+
+        # ---------------------------------------------
+        # Infected machines detected and isolated
+        # ---------------------------------------------
+
+        isolation = q * I
+
+        # ---------------------------------------------
+        # Susceptible machines proactively protected
+        # ---------------------------------------------
+
+        protection = u * S
+
+
+        # ---------------------------------------------
+        # Differential equations
+        # ---------------------------------------------
+
+        dS = -infection - protection
+
+        dI = infection - isolation
+
+        dR = isolation + protection
+
+        # cumulative infection exposure
+
+        dC = I
+
+
+        # ---------------------------------------------
+        # Euler integration
+        # ---------------------------------------------
+
+        S_new = S + self.dt * dS
+
+        I_new = I + self.dt * dI
+
+        R_new = R + self.dt * dR
+
+        C_new = C + self.dt * dC
+
+
+        return torch.stack(
+            [S_new, I_new, R_new, C_new],
+            dim=1
+        )
+
+
+model = MalwareStep(dt=dt).to(device)
+
+
+# ============================================================
+# NIO parameter bounds
+# ============================================================
+#
+# Physical / cybersecurity quantities:
+#
+# I0:
+#     0.1% - 10% initially compromised
+#
+# beta:
+#     0.10 - 2.00 malware transmission rate
+#
+# alpha:
+#     0 - 1
+#
+# alpha = 0
+#     ALL security resources go to proactive protection
+#
+# alpha = 1
+#     ALL security resources go to detection/isolation
+#
+# ============================================================
+
+
+low = torch.tensor(
+    [
+        0.001,      # I0
+        0.10,       # beta
+        0.00        # alpha
+    ],
+    device=device
+)
+
+
+high = torch.tensor(
+    [
+        0.10,       # I0
+        2.00,       # beta
+        1.00        # alpha
+    ],
+    device=device
+)
+
+
+# ============================================================
+# Convert NIO latent variables into real parameters
+# ============================================================
+
+def decode_parameters(z):
+
+    p = low + (high - low) * torch.sigmoid(z)
+
+    I0 = p[:, 0]
+
+    beta = p[:, 1]
+
+    alpha = p[:, 2]
+
+
+    # --------------------------------------------------------
+    # Fixed budget allocation
+    # --------------------------------------------------------
+
+    q = alpha * B
+
+    u = (1.0 - alpha) * B
+
+
+    return I0, beta, alpha, q, u
+
+
+# ============================================================
+# Simulate malware outbreak
+# ============================================================
+
+def simulate(I0, beta, q, u):
+
+    S0 = 1.0 - I0
+
+    R0 = torch.zeros_like(I0)
+
+    C0 = torch.zeros_like(I0)
+
+
+    state = torch.stack(
+        [
+            S0,
+            I0,
+            R0,
+            C0
+        ],
+        dim=1
+    )
+
+
+    trajectory = [state]
+
+
+    for t in range(Time_steps):
+
+        state = model(
+            state,
+            beta,
+            q,
+            u
+        )
+
+        trajectory.append(state)
+
+
+    return torch.stack(trajectory)
+
+
+# ============================================================
+# Malware damage function
+# ============================================================
+#
+# We care about TWO things:
+#
+# 1. cumulative infection burden
+#
+#       integral I(t) dt
+#
+# 2. peak fraction of network infected
+#
+# This prevents the optimizer from caring only about
+# the final state.
+#
+# ============================================================
+
+def malware_damage(trajectory):
+
+    I = trajectory[:, :, 1]
+
+    cumulative = trajectory[-1, :, 3]
+
+    peak = torch.max(
+        I,
+        dim=0
+    ).values
+
+
+    damage = cumulative + 2.0 * peak
+
+
+    return damage
+
+
+# ============================================================
+# EXPERIMENT 1
+#
+# NIO discovers the WORST malware conditions.
+#
+# Security policy is fixed at 50/50 here.
+#
+# This finds dangerous initial conditions:
+#
+#       I0
+#       beta
+#
+# ============================================================
+
+print("\n")
+print("==============================================")
+print("EXPERIMENT 1")
+print("NIO SEARCHING FOR WORST MALWARE CONDITIONS")
+print("==============================================")
+
+
+# alpha = 0.5 corresponds to q = u = B/2
+
+# We optimize only I0 and beta here.
+
+z_attack = torch.randn(
+    N,
+    2,
+    device=device,
+    requires_grad=True
+)
+
+
+optimizer = optim.Adam(
+    [z_attack],
+    lr=0.01
+)
+
+
+for i in range(iters):
+
+    # bounded I0
+
+    I0 = (
+        low[0]
+        +
+        (high[0] - low[0])
+        * torch.sigmoid(z_attack[:, 0])
+    )
+
+    # bounded beta
+
+    beta = (
+        low[1]
+        +
+        (high[1] - low[1])
+        * torch.sigmoid(z_attack[:, 1])
+    )
+
+
+    # Equal security allocation
+
+    q = torch.ones_like(I0) * B / 2.0
+
+    u = torch.ones_like(I0) * B / 2.0
+
+
+    trajectory = simulate(
+        I0,
+        beta,
+        q,
+        u
+    )
+
+
+    damage = malware_damage(
+        trajectory
+    ).mean()
+
+
+    # Negative because Adam minimizes
+
+    loss = -damage
+
+
+    optimizer.zero_grad()
+
+    loss.backward()
+
+    optimizer.step()
+
+
+    if i % 100 == 0:
+
+        print(
+            "iter", i,
+            "damage", damage.item(),
+            "I0", I0.mean().item(),
+            "beta", beta.mean().item()
+        )
+
+
+# ============================================================
+# Save discovered dangerous conditions
+# ============================================================
+
+with torch.no_grad():
+
+    I0_attack = (
+        low[0]
+        +
+        (high[0] - low[0])
+        * torch.sigmoid(z_attack[:, 0])
+    )
+
+
+    beta_attack = (
+        low[1]
+        +
+        (high[1] - low[1])
+        * torch.sigmoid(z_attack[:, 1])
+    )
+
+
+print("\nWorst-case conditions found:")
+
+print(
+    "I0   =",
+    I0_attack.mean().item()
+)
+
+print(
+    "beta =",
+    beta_attack.mean().item()
+)
+
+
+# ============================================================
+# EXPERIMENT 2
+#
+# NOW THE IMPORTANT EXPERIMENT.
+#
+# Hold the malware conditions found above fixed.
+#
+# NIO determines how to allocate the LIMITED security budget.
+#
+# ============================================================
+
+print("\n")
+print("==============================================")
+print("EXPERIMENT 2")
+print("NIO OPTIMIZING LIMITED SECURITY BUDGET")
+print("==============================================")
+
+
+# Freeze dangerous malware conditions
+
+I0_fixed = I0_attack.detach()
+
+beta_fixed = beta_attack.detach()
+
+
+# One NIO variable:
+#
+# alpha = security budget allocation
+
+z_policy = torch.randn(
+    N,
+    1,
+    device=device,
+    requires_grad=True
+)
+
+
+optimizer = optim.Adam(
+    [z_policy],
+    lr=0.01
+)
+
+
+for i in range(iters):
+
+    alpha = torch.sigmoid(
+        z_policy[:, 0]
+    )
+
+
+    # -----------------------------------------
+    # Fixed total security budget
+    # -----------------------------------------
+
+    q = alpha * B
+
+    u = (1.0 - alpha) * B
+
+
+    trajectory = simulate(
+        I0_fixed,
+        beta_fixed,
+        q,
+        u
+    )
+
+
+    damage = malware_damage(
+        trajectory
+    ).mean()
+
+
+    # Here we MINIMIZE malware damage
+
+    loss = damage
+
+
+    optimizer.zero_grad()
+
+    loss.backward()
+
+    optimizer.step()
+
+
+    if i % 100 == 0:
+
+        print(
+            "iter", i,
+            "damage", damage.item(),
+            "alpha", alpha.mean().item(),
+            "q", q.mean().item(),
+            "u", u.mean().item()
+        )
+
+
+# ============================================================
+# Final optimized policy
+# ============================================================
+
+with torch.no_grad():
+
+    alpha_opt = torch.sigmoid(
+        z_policy[:, 0]
+    )
+
+    q_opt = alpha_opt * B
+
+    u_opt = (1.0 - alpha_opt) * B
+
+
+    trajectory_opt = simulate(
+        I0_fixed,
+        beta_fixed,
+        q_opt,
+        u_opt
+    )
+
+
+print("\n")
+print("==============================================")
+print("FINAL NIO SECURITY POLICY")
+print("==============================================")
+
+
+print(
+    "Security budget B =",
+    B
+)
+
+print(
+    "Fraction allocated to isolation =",
+    alpha_opt.mean().item()
+)
+
+print(
+    "Isolation q =",
+    q_opt.mean().item()
+)
+
+print(
+    "Protection u =",
+    u_opt.mean().item()
+)
+
+
+# ============================================================
+# Compare against simple policies
+# ============================================================
+#
+# This is important.
+#
+# We compare NIO against:
+#
+#   100% protection
+#   50/50
+#   100% isolation
+#
+# ============================================================
+
+with torch.no_grad():
+
+
+    # --------------------------------------------------------
+    # Policy A: all proactive protection
+    # --------------------------------------------------------
+
+    q_A = torch.zeros_like(I0_fixed)
+
+    u_A = torch.ones_like(I0_fixed) * B
+
+
+    traj_A = simulate(
+        I0_fixed,
+        beta_fixed,
+        q_A,
+        u_A
+    )
+
+
+    damage_A = malware_damage(
+        traj_A
+    ).mean()
+
+
+    # --------------------------------------------------------
+    # Policy B: equal allocation
+    # --------------------------------------------------------
+
+    q_B = torch.ones_like(I0_fixed) * B / 2.0
+
+    u_B = torch.ones_like(I0_fixed) * B / 2.0
+
+
+    traj_B = simulate(
+        I0_fixed,
+        beta_fixed,
+        q_B,
+        u_B
+    )
+
+
+    damage_B = malware_damage(
+        traj_B
+    ).mean()
+
+
+    # --------------------------------------------------------
+    # Policy C: all detection/isolation
+    # --------------------------------------------------------
+
+    q_C = torch.ones_like(I0_fixed) * B
+
+    u_C = torch.zeros_like(I0_fixed)
+
+
+    traj_C = simulate(
+        I0_fixed,
+        beta_fixed,
+        q_C,
+        u_C
+    )
+
+
+    damage_C = malware_damage(
+        traj_C
+    ).mean()
+
+
+    # --------------------------------------------------------
+    # NIO
+    # --------------------------------------------------------
+
+    damage_NIO = malware_damage(
+        trajectory_opt
+    ).mean()
+
+
+print("\n")
+print("==============================================")
+print("POLICY COMPARISON")
+print("==============================================")
+
+
+print(
+    "100% protection damage:",
+    damage_A.item()
+)
+
+print(
+    "50/50 damage:",
+    damage_B.item()
+)
+
+print(
+    "100% isolation damage:",
+    damage_C.item()
+)
+
+print(
+    "NIO optimized damage:",
+    damage_NIO.item()
+)
+
+
+# ============================================================
+# Plot infection trajectories
+# ============================================================
+
+with torch.no_grad():
+
+    curve_A = traj_A[:, :, 1].mean(dim=1)
+
+    curve_B = traj_B[:, :, 1].mean(dim=1)
+
+    curve_C = traj_C[:, :, 1].mean(dim=1)
+
+    curve_NIO = trajectory_opt[:, :, 1].mean(dim=1)
+
+
+time = (
+    torch.arange(Time_steps + 1)
+    * dt
+).cpu().numpy()
+
+
+plt.figure(
+    figsize=(10, 6)
+)
+
+
+plt.plot(
+    time,
+    curve_A.cpu().numpy(),
+    label="100% Protection"
+)
+
+
+plt.plot(
+    time,
+    curve_B.cpu().numpy(),
+    label="50/50"
+)
+
+
+plt.plot(
+    time,
+    curve_C.cpu().numpy(),
+    label="100% Isolation"
+)
+
+
+plt.plot(
+    time,
+    curve_NIO.cpu().numpy(),
+    label="NIO Policy",
+    linewidth=3
+)
+
+
+plt.xlabel(
+    "Time"
+)
+
+plt.ylabel(
+    "Fraction of Network Infected"
+)
+
+plt.title(
+    "Malware Spread Under Limited Security Budget"
+)
+
+plt.legend()
+
+plt.grid(True)
+
+plt.show()
+
+
+# ============================================================
+# IMPORTANT EXPERIMENT 3
+#
+# Sweep malware transmission rate.
+#
+# For EACH beta:
+#
+# let NIO discover the best security policy.
+#
+# This tells us whether the optimal policy changes as the
+# malware becomes more aggressive.
+#
+# ============================================================
+
+
+print("\n")
+print("==============================================")
+print("EXPERIMENT 3")
+print("POLICY VS MALWARE TRANSMISSION RATE")
+print("==============================================")
+
+
+beta_values = torch.linspace(
+    0.20,
+    2.00,
+    20
+)
+
+
+alpha_results = []
+
+damage_results = []
+
+
+# Use 5% initial compromise for this controlled experiment
+
+I0_sweep_value = 0.05
+
+
+for beta_value in beta_values:
+
+
+    I0_sweep = torch.ones(
+        N,
+        device=device
+    ) * I0_sweep_value
+
+
+    beta_sweep = torch.ones(
+        N,
+        device=device
+    ) * beta_value.item()
+
+
+    z = torch.zeros(
+        N,
+        1,
+        device=device,
+        requires_grad=True
+    )
+
+
+    optimizer = optim.Adam(
+        [z],
+        lr=0.02
+    )
+
+
+    for i in range(600):
+
+
+        alpha = torch.sigmoid(
+            z[:, 0]
+        )
+
+
+        q = alpha * B
+
+        u = (1.0 - alpha) * B
+
+
+        trajectory = simulate(
+            I0_sweep,
+            beta_sweep,
+            q,
+            u
+        )
+
+
+        loss = malware_damage(
+            trajectory
+        ).mean()
+
+
+        optimizer.zero_grad()
+
+        loss.backward()
+
+        optimizer.step()
+
+
+    with torch.no_grad():
+
+        alpha = torch.sigmoid(
+            z[:, 0]
+        )
+
+
+        q = alpha * B
+
+        u = (1.0 - alpha) * B
+
+
+        trajectory = simulate(
+            I0_sweep,
+            beta_sweep,
+            q,
+            u
+        )
+
+
+        damage = malware_damage(
+            trajectory
+        ).mean()
+
+
+        alpha_results.append(
+            alpha.mean().item()
+        )
+
+        damage_results.append(
+            damage.item()
+        )
+
+
+        print(
+            "beta",
+            beta_value.item(),
+            "alpha",
+            alpha.mean().item(),
+            "q",
+            q.mean().item(),
+            "u",
+            u.mean().item(),
+            "damage",
+            damage.item()
+        )
+
+
+# ============================================================
+# Plot optimal policy versus malware aggressiveness
+# ============================================================
+
+plt.figure(
+    figsize=(9, 5)
+)
+
+
+plt.plot(
+    beta_values.numpy(),
+    alpha_results,
+    marker="o"
+)
+
+
+plt.axhline(
+    0.5,
+    linestyle="--"
+)
+
+
+plt.xlabel(
+    "Malware Transmission Rate beta"
+)
+
+plt.ylabel(
+    "Fraction of Security Budget Allocated to Isolation"
+)
+
+plt.title(
+    "NIO Optimal Security Policy vs Malware Transmission Rate"
+)
+
+plt.grid(True)
+
+plt.show()
+
+
+# ============================================================
+# Save results
+# ============================================================
+
+results = pd.DataFrame({
+
+    "beta":
+        beta_values.numpy(),
+
+    "optimal_isolation_fraction":
+        alpha_results,
+
+    "optimal_protection_fraction":
+        [1.0 - x for x in alpha_results],
+
+    "damage":
+        damage_results
+})
+
+
+results.to_csv(
+    "nio_cybersecurity_policy_sweep.csv",
+    index=False
+)
+
+
+print(
+    "\nSaved: nio_cybersecurity_policy_sweep.csv"
+)
+
+
+```
+
+
 ## NIO + mathematical image/video dynamics
 
 
