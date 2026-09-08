@@ -7796,6 +7796,540 @@ for rank in range(20):
 ```
 
 
+try some proving
+
+
+
+```
+
+
+print("\n==============================================")
+print("SCIENTIFIC INTERPRETATION")
+print("==============================================")
+
+j = np.argmin(mp_zeta)
+
+sigma_best = sigma_final[j]
+t_best     = t_final[j]
+zeta_best  = mp_zeta[j]
+
+distance = abs(sigma_best - 0.5)
+
+print("Best candidate:")
+print("sigma =", sigma_best)
+print("t     =", t_best)
+print("|zeta| =", zeta_best)
+print("|sigma - 0.5| =", distance)
+
+if zeta_best < 1e-20 and distance > 1e-6:
+
+    print("\n*** POTENTIAL OFF-CRITICAL-LINE ZERO ***")
+    print("NIO has found a numerical candidate away from sigma = 0.5.")
+    print("IF rigorous independent mathematics confirms zeta(s) = 0,")
+    print("this would constitute a counterexample to the Riemann Hypothesis.")
+    print("DO NOT interpret this numerical result itself as a disproof.")
+    print("The candidate requires arbitrary-precision and rigorous verification.")
+
+elif zeta_best < 1e-20 and distance <= 1e-6:
+
+    print("\nNIO found a candidate zero on the critical line.")
+    print("This is consistent with the Riemann Hypothesis,")
+    print("but does not provide a proof.")
+
+else:
+
+    print("\nNo convincing zero candidate was discovered.")
+    print("This result neither proves nor disproves the Riemann Hypothesis.")
+
+
+
+```
+
+
+
+
+
+try this too
+
+
+```
+
+
+
+import torch
+import numpy as np
+import mpmath as mp
+import math
+
+torch.manual_seed(7)
+np.random.seed(7)
+
+dtype  = torch.float64
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# ============================================================
+# NIO SEARCH FOR AN OFF-CRITICAL-LINE ZETA ZERO
+#
+# Goal:
+#   make |zeta(s)| small
+#   while pushing Re(s) AWAY from 0.5
+#
+# IMPORTANT:
+#   A numerical candidate is NOT a disproof of RH.
+# ============================================================
+
+NPOINTS = 500
+ITERS   = 3000
+LR      = 0.005
+
+SIGMA_MIN = 0.01
+SIGMA_MAX = 0.99
+
+# Start with a region where we know the numerics can be tested.
+# Later increase these windows.
+T_MIN = 10.0
+T_MAX = 100.0
+
+# pressure away from critical line
+LAMBDA_OFF = 0.05
+
+# Euler-Maclaurin
+NSUM = 100
+
+BERNOULLI = [
+     1/6,
+    -1/30,
+     1/42,
+    -1/30,
+     5/66,
+    -691/2730,
+     7/6,
+    -3617/510,
+     43867/798,
+    -174611/330
+]
+
+
+# ============================================================
+# COMPLEX ARITHMETIC
+# ============================================================
+
+def cmul(ar, ai, br, bi):
+    return ar*br-ai*bi, ar*bi+ai*br
+
+
+def cdiv(ar, ai, br, bi):
+
+    d = br*br + bi*bi + 1e-30
+
+    return (
+        (ar*br + ai*bi)/d,
+        (ai*br - ar*bi)/d
+    )
+
+
+# ============================================================
+# DIFFERENTIABLE EULER-MACLAURIN ZETA
+# ============================================================
+
+def zeta_em(sigma, t):
+
+    batch = sigma.shape[0]
+
+    zr = torch.zeros(batch, dtype=dtype, device=device)
+    zi = torch.zeros(batch, dtype=dtype, device=device)
+
+    # --------------------------------------------------------
+    # finite sum
+    # --------------------------------------------------------
+
+    n = torch.arange(
+        1,
+        NSUM,
+        dtype=dtype,
+        device=device
+    )
+
+    logn = torch.log(n)
+
+    mag = torch.exp(
+        -sigma[:,None] * logn[None,:]
+    )
+
+    ang = (
+        t[:,None] * logn[None,:]
+    )
+
+    zr += torch.sum(
+        mag * torch.cos(ang),
+        dim=1
+    )
+
+    zi += torch.sum(
+        -mag * torch.sin(ang),
+        dim=1
+    )
+
+    # --------------------------------------------------------
+    # N^(-s)
+    # --------------------------------------------------------
+
+    logN = math.log(NSUM)
+
+    magN = torch.exp(
+        -sigma * logN
+    )
+
+    angN = t * logN
+
+    Nr = magN * torch.cos(angN)
+    Ni = -magN * torch.sin(angN)
+
+    # 1/2 N^-s
+
+    zr += 0.5 * Nr
+    zi += 0.5 * Ni
+
+    # --------------------------------------------------------
+    # N^(1-s)/(s-1)
+    # --------------------------------------------------------
+
+    tr, ti = cdiv(
+        NSUM*Nr,
+        NSUM*Ni,
+        sigma-1.0,
+        t
+    )
+
+    zr += tr
+    zi += ti
+
+    # --------------------------------------------------------
+    # Bernoulli corrections
+    # --------------------------------------------------------
+
+    for k, B in enumerate(BERNOULLI, start=1):
+
+        order = 2*k
+
+        pr = torch.ones(
+            batch,
+            dtype=dtype,
+            device=device
+        )
+
+        pi = torch.zeros(
+            batch,
+            dtype=dtype,
+            device=device
+        )
+
+        # rising factorial
+        # s(s+1)...(s+2k-2)
+
+        for j in range(order-1):
+
+            pr, pi = cmul(
+                pr, pi,
+                sigma + j,
+                t
+            )
+
+        scale = NSUM ** (-(order-1))
+
+        cr, ci = cmul(
+            pr, pi,
+            Nr*scale,
+            Ni*scale
+        )
+
+        coefficient = (
+            B / math.factorial(order)
+        )
+
+        zr += coefficient * cr
+        zi += coefficient * ci
+
+    return zr, zi
+
+
+# ============================================================
+# NIO PARAMETERIZATION
+# ============================================================
+
+def decode(z):
+
+    sigma = (
+        SIGMA_MIN
+        +
+        (SIGMA_MAX-SIGMA_MIN)
+        *
+        torch.sigmoid(z[:,0])
+    )
+
+    t = (
+        T_MIN
+        +
+        (T_MAX-T_MIN)
+        *
+        torch.sigmoid(z[:,1])
+    )
+
+    return sigma, t
+
+
+# ============================================================
+# INITIALIZATION
+# ============================================================
+
+z = torch.randn(
+    NPOINTS,
+    2,
+    dtype=dtype,
+    device=device,
+    requires_grad=True
+)
+
+optimizer = torch.optim.Adam(
+    [z],
+    lr=LR
+)
+
+
+# ============================================================
+# NIO
+# ============================================================
+
+print("\n==============================================")
+print("NIO OFF-CRITICAL-LINE SEARCH")
+print("==============================================")
+
+for iteration in range(ITERS):
+
+    sigma, t = decode(z)
+
+    zr, zi = zeta_em(
+        sigma,
+        t
+    )
+
+    zeta2 = zr*zr + zi*zi
+
+    distance2 = (
+        sigma - 0.5
+    )**2
+
+    # --------------------------------------------------------
+    # Find zero, BUT reward distance from 0.5
+    # --------------------------------------------------------
+
+    loss_each = (
+        zeta2
+        -
+        LAMBDA_OFF * distance2
+    )
+
+    loss = loss_each.mean()
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    if iteration % 200 == 0:
+
+        print(
+            iteration,
+            "loss =",
+            loss.item(),
+            "mean |zeta| =",
+            torch.sqrt(zeta2).mean().item(),
+            "mean distance from .5 =",
+            torch.abs(sigma-.5).mean().item()
+        )
+
+
+# ============================================================
+# COLLECT RESULTS
+# ============================================================
+
+with torch.no_grad():
+
+    sigma, t = decode(z)
+
+    zr, zi = zeta_em(
+        sigma,
+        t
+    )
+
+    abs_zeta = torch.sqrt(
+        zr*zr + zi*zi
+    )
+
+
+sigma = sigma.cpu().numpy()
+t = t.cpu().numpy()
+abs_zeta = abs_zeta.cpu().numpy()
+
+
+# ============================================================
+# FIND INTERESTING CANDIDATES
+#
+# Prefer:
+#   small |zeta|
+#   AND far from 0.5
+# ============================================================
+
+distance = np.abs(
+    sigma - 0.5
+)
+
+score = (
+    abs_zeta
+    /
+    (distance + 1e-12)
+)
+
+order = np.argsort(score)
+
+
+# ============================================================
+# INDEPENDENT HIGH-PRECISION VERIFICATION
+# ============================================================
+
+print("\n==============================================")
+print("INDEPENDENT VERIFICATION")
+print("==============================================")
+
+best_candidate = None
+
+for rank in range(20):
+
+    j = order[rank]
+
+    # Ignore points essentially on critical line
+
+    if distance[j] < 1e-5:
+        continue
+
+    print("\nCandidate", rank+1)
+
+    print("sigma =", sigma[j])
+    print("t     =", t[j])
+    print("NIO |zeta| =", abs_zeta[j])
+    print("|sigma-.5| =", distance[j])
+
+    values = []
+
+    # --------------------------------------------------------
+    # Completely independent mpmath evaluation
+    # --------------------------------------------------------
+
+    for digits in [50, 100, 200]:
+
+        mp.mp.dps = digits
+
+        s = mp.mpc(
+            str(sigma[j]),
+            str(t[j])
+        )
+
+        value = abs(
+            mp.zeta(s)
+        )
+
+        values.append(value)
+
+        print(
+            digits,
+            "digit |zeta| =",
+            mp.nstr(value, 25)
+        )
+
+    # --------------------------------------------------------
+    # candidate condition
+    #
+    # This ONLY means "interesting enough to investigate."
+    # --------------------------------------------------------
+
+    if values[-1] < mp.mpf("1e-20"):
+
+        best_candidate = (
+            sigma[j],
+            t[j],
+            values[-1]
+        )
+
+        break
+
+
+# ============================================================
+# SCIENTIFIC INTERPRETATION
+# ============================================================
+
+print("\n\n==============================================")
+print("SCIENTIFIC INTERPRETATION")
+print("==============================================")
+
+
+if best_candidate is None:
+
+    print("""
+NO COUNTEREXAMPLE FOUND.
+
+NIO did not identify a credible off-critical-line zero
+in the region searched.
+
+This result neither proves nor disproves the
+Riemann Hypothesis.
+""")
+
+
+else:
+
+    sb, tb, zb = best_candidate
+
+    print("\n*** POTENTIAL OFF-CRITICAL-LINE CANDIDATE ***")
+
+    print("\nsigma =", sb)
+    print("t     =", tb)
+    print("|zeta| =", mp.nstr(zb, 30))
+
+    print("""
+NIO has identified a numerical point away from
+Re(s) = 0.5 where the independently evaluated
+Riemann zeta function is extremely small.
+
+THIS IS NOT YET A COUNTEREXAMPLE TO THE
+RIEMANN HYPOTHESIS.
+
+If rigorous independent mathematics establishes
+that zeta(s) is exactly zero at this off-critical-line
+location, then this would constitute a counterexample
+and the Riemann Hypothesis would be false.
+
+The candidate must therefore be independently and
+rigorously verified before any mathematical claim
+is made.
+""")
+
+
+# ============================================================
+# SHOW BEST NUMERICAL POINT REGARDLESS
+# ============================================================
+
+j = order[0]
+
+print("==============================================")
+print("BEST NIO POINT")
+print("==============================================")
+
+print("sigma =", sigma[j])
+print("t     =", t[j])
+print("NIO |zeta| =", abs_zeta[j])
+print("|sigma-.5| =", distance[j])
+
+
+```
 
 
 
