@@ -1,6 +1,6 @@
 ## Paper Ideas
 
-* link
+* link - code 
 
 ## NIO + cybersecurity/malware dynamics
 
